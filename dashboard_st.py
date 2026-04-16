@@ -1690,303 +1690,430 @@ def page_add():
 # ─── CSS（完全对齐截图平台视觉风格） ────────────────────────────────
 CSS = """
 <style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
 /* ══════════════════════════════════════════════════════
-   驭研科技 ODD 标注平台 v3
-   主色  #0d2d5e · 品牌  #1a56a8 · 亮色  #3b7dd8
-   背景  #eef2f9
-   完全对齐「自然驾驶数据集统计平台」截图风格
+   Design tokens — sourced from driveresearch.tech/styles.css
+     --navy        #0f1923    深蓝（nav / dark sections）
+     --navy-light  #1a2636
+     --blue        #3d6b8e    主品牌蓝
+     --blue-light  #4d7fa6
+     --accent      #c85a3a    橙红强调（CTA / active）
+     --white       #faf9f5    暖白
+     --gray-50/100/200/400/600/800  灰阶
+   字体：Inter（EN）+ PingFang SC / Noto Sans SC（ZH）
 ══════════════════════════════════════════════════════ */
 
-/* ── 隐藏 Streamlit 原生工具栏 / 菜单 / 页脚，并清除 stMain 预留的顶部占位 ── */
+/* ── 全局字体（对齐 driveresearch.tech 的 Inter + PingFang SC fallback）── */
+html, body, [class*="css"], .stApp, .block-container,
+/* 强制 Streamlit 所有子组件继承 Inter，覆盖默认的 Source Sans Pro */
+h1, h2, h3, h4, h5, h6, p, div, a, li, ul,
+button, input, select, textarea, label,
+.stMarkdown, .stTabs, .stButton, .stRadio, .stSelectbox, .stMultiSelect,
+[data-testid="stMarkdownContainer"] {
+    font-family: 'Inter','PingFang SC','Noto Sans SC','Microsoft YaHei',
+                 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif !important;
+}
+/* 例外：Material Symbols icons — Streamlit 用这个字体画下拉箭头、
+   展开标记等 UI 图标，强制覆盖会让它们变成文字如 "keyboard_arrow_down" */
+[data-testid="stIconMaterial"],
+[data-testid*="stIcon"],
+span.material-symbols-outlined,
+span.material-icons,
+[class*="material-symbols"] {
+    font-family: 'Material Symbols Rounded','Material Symbols Outlined',
+                 'Material Icons',sans-serif !important;
+}
+html, body, .stApp {
+    font-size: 16px;
+    line-height: 1.6;
+    color: #2a2925;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* ── 隐藏 Streamlit 原生 chrome ── */
 header[data-testid="stHeader"]       { display:none !important; height:0 !important; }
-[data-testid="stToolbar"]            { display:none !important; height:0 !important; }
-[data-testid="stDecoration"]         { display:none !important; height:0 !important; }
+[data-testid="stToolbar"]            { display:none !important; }
+[data-testid="stDecoration"]         { display:none !important; }
 #MainMenu                            { display:none !important; }
 footer                               { display:none !important; }
-/* 清除 Streamlit 给工具栏预留的 padding-top */
 section[data-testid="stMain"]        { padding-top: 0 !important; }
-section[data-testid="stMain"] > div:first-child { padding-top: 0 !important; }
 
 /* ── 全局背景 ── */
-.stApp { background: #eef2f9 !important; }
+.stApp { background: #faf9f5 !important; }
 
-/* ── 主内容卡片 ── */
+/* ── 主内容容器（扁平化、去掉卡片感） ── */
 .block-container {
-    background: rgba(255,255,255,0.97) !important;
-    border-radius: 16px !important;
-    padding: 0 2rem 2.4rem !important;
-    box-shadow: 0 2px 20px rgba(13,45,94,0.07) !important;
-    border: 1px solid rgba(26,86,168,0.09) !important;
-    max-width: 1400px !important;
+    background: transparent !important;
+    /* 96px = 72 nav + 24 breathing; leaves room for the fixed nav. */
+    padding: 96px 24px 64px !important;
+    max-width: 1160px !important;
+    box-shadow: none !important;
+    border: none !important;
 }
 
 /* ══════════════════════════════════════════════════════
-   品牌 Header — 深蓝渐变 + 扫光 + tech bracket
+   Top nav — 对齐 driveresearch.tech 的 hero nav
 ══════════════════════════════════════════════════════ */
-.brand-header {
-    background: linear-gradient(120deg,#010c1f 0%,#021630 18%,#0b2a58 45%,#0e3570 60%,#0b2a58 80%,#010c1f 100%);
-    border-radius: 0 0 14px 14px;
-    padding: 1.5rem 2rem 1.4rem;
-    margin: 0 -2rem 2rem;
-    display: flex; align-items: center; gap: 1.6rem;
-    position: relative; overflow: hidden;
-    border-bottom: 2px solid rgba(59,125,216,0.55);
-    box-shadow: 0 8px 40px rgba(2,14,40,0.6), inset 0 1px 0 rgba(120,180,255,0.12);
+.drh-nav {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+    z-index: 900;
+    background: #0f1923;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
 }
-.brand-header::before {
-    content:''; position:absolute; top:0; left:-80%; width:55%; height:100%;
-    background: linear-gradient(90deg,transparent,rgba(120,190,255,0.06),transparent);
-    animation: header-sweep 6s ease-in-out infinite; pointer-events:none; z-index:1;
+.drh-nav-inner {
+    max-width: 1160px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 72px;
+    padding: 0 24px;
+    gap: 28px;
 }
-@keyframes header-sweep { 0%{left:-80%} 100%{left:130%} }
-.brand-header::after {
-    content:''; position:absolute; top:-60%; right:-10%; width:55%; height:220%;
-    background: radial-gradient(ellipse 60% 60% at 70% 50%,rgba(59,125,216,0.20) 0%,transparent 65%),
-                radial-gradient(ellipse 30% 40% at 85% 40%,rgba(100,180,255,0.10) 0%,transparent 60%);
-    pointer-events:none; z-index:0;
+.drh-nav-logo img {
+    height: 38px;
+    width: auto;
+    display: block;
 }
-.tc-tl {
-    position:absolute; top:10px; left:12px; width:16px; height:16px;
-    border-top:2px solid rgba(80,160,255,0.6); border-left:2px solid rgba(80,160,255,0.6);
-    border-radius:3px 0 0 0; z-index:3;
+.drh-nav-links {
+    display: flex;
+    gap: 32px;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    flex: 1;
+    justify-content: center;
 }
-.tc-br {
-    position:absolute; bottom:10px; right:14px; width:16px; height:16px;
-    border-bottom:2px solid rgba(80,160,255,0.6); border-right:2px solid rgba(80,160,255,0.6);
-    border-radius:0 0 3px 0; z-index:3;
+.drh-nav-links a {
+    color: #faf9f5;
+    text-decoration: none;
+    font-size: 15px;
+    font-weight: 500;
+    letter-spacing: 0.3px;
+    opacity: 0.85;
+    transition: opacity 0.2s, color 0.2s;
 }
-.brand-logo {
-    width:52px; height:52px; flex-shrink:0;
-    background:rgba(255,255,255,0.08); border:1.5px solid rgba(255,255,255,0.22);
-    border-radius:10px; display:flex; align-items:center; justify-content:center;
-    font-size:1.8rem; position:relative; z-index:2;
+.drh-nav-links a:hover  { opacity: 1; color: #faf9f5; }
+.drh-nav-links a.active { opacity: 1; color: #e8a08c; }
+.drh-nav-lang-slot      { width: 110px; }
+
+/* 语言切换 pill — Streamlit 给 key=_lang_picker 的 container 加了
+   `.st-key-_lang_picker`；我们 fixed 到 nav 右上，风格对齐官网 pill */
+.st-key-_lang_picker {
+    position: fixed !important;
+    top: 18px;
+    right: 28px;
+    z-index: 1001;
+    width: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
 }
-.brand-text { flex:1; position:relative; z-index:2; }
-.brand-title {
-    font-size:1.75rem; font-weight:900; letter-spacing:3px; line-height:1.15;
-    background:linear-gradient(90deg,#fff 0%,#cce4ff 45%,#fff 70%,#a8d0ff 100%);
-    -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;
-    animation:title-glow 4s ease-in-out infinite;
+.st-key-_lang_picker [data-testid="stRadio"] > label { display: none !important; }
+.st-key-_lang_picker [role="radiogroup"] {
+    flex-direction: row !important;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.28);
+    border-radius: 20px;
+    padding: 2px;
+    gap: 0 !important;
 }
-@keyframes title-glow {
-    0%,100%{filter:drop-shadow(0 0 8px rgba(80,150,255,0.6))}
-    50%{filter:drop-shadow(0 0 16px rgba(120,190,255,0.95))}
+.st-key-_lang_picker [role="radiogroup"] > label {
+    padding: 3px 12px !important;
+    margin: 0 !important;
+    border-radius: 14px;
+    cursor: pointer;
+    background: transparent !important;
 }
-.brand-sub {
-    font-size:0.68rem; color:rgba(140,195,255,0.65);
-    letter-spacing:2.5px; margin-top:6px; font-weight:600; text-transform:uppercase;
+.st-key-_lang_picker [role="radiogroup"] > label p {
+    font-size: 12px !important;
+    font-weight: 600 !important;
+    color: rgba(255,255,255,0.75) !important;
+    margin: 0 !important;
 }
-.brand-badge {
-    font-size:0.70rem; font-weight:700; color:rgba(180,220,255,0.95);
-    background:linear-gradient(135deg,rgba(20,60,140,0.55),rgba(10,40,100,0.45));
-    border:1px solid rgba(80,150,255,0.5); border-radius:22px;
-    padding:6px 18px; position:relative; z-index:2; letter-spacing:1px;
-    box-shadow:0 0 16px rgba(59,125,216,0.4);
-    animation:pulse-badge 3s ease-in-out infinite;
+.st-key-_lang_picker [role="radiogroup"] > label:has(input:checked) {
+    background: rgba(255,255,255,0.22) !important;
 }
-@keyframes pulse-badge {
-    0%,100%{box-shadow:0 0 14px rgba(59,125,216,0.35)}
-    50%{box-shadow:0 0 26px rgba(80,160,255,0.65)}
+.st-key-_lang_picker [role="radiogroup"] > label:has(input:checked) p {
+    color: #fff !important;
+}
+/* Hide Streamlit's radio dot */
+.st-key-_lang_picker [role="radiogroup"] > label > div:first-child {
+    display: none !important;
 }
 
 /* ══════════════════════════════════════════════════════
-   隐藏侧边栏（导航已移至顶部）
-══════════════════════════════════════════════════════ */
-[data-testid="stSidebar"],
-[data-testid="collapsedControl"] { display:none !important; }
-.block-container { margin-left:0 !important; padding-left:2rem !important; }
-
-/* ══════════════════════════════════════════════════════
-   顶部 Tabs 导航 — 大号醒目
+   Tabs — flat underline like drh nav-links
 ══════════════════════════════════════════════════════ */
 .stTabs [data-baseweb="tab-list"] {
-    gap:6px;
-    background:linear-gradient(90deg,rgba(13,45,94,0.06),rgba(26,86,168,0.08));
-    border-radius:12px; padding:4px 6px;
-    border:1px solid rgba(26,86,168,0.14);
-    margin-bottom:16px;
+    gap: 4px;
+    border-bottom: 1px solid #e0ded6;
+    background: transparent;
+    padding: 0;
+    margin-bottom: 28px;
 }
 .stTabs [data-baseweb="tab"] {
-    border-radius:9px; font-weight:700; font-size:0.95rem;
-    color:#3d5f8f; padding:0.55rem 1.4rem; letter-spacing:0.3px;
-    transition:all 0.18s ease;
+    background: transparent !important;
+    border-radius: 0 !important;
+    border-bottom: 2px solid transparent !important;
+    padding: 12px 20px !important;
+    font-weight: 500 !important;
+    font-size: 15px !important;
+    color: #5a5850 !important;
+    letter-spacing: 0.3px !important;
+    transition: color 0.2s, border-color 0.2s;
 }
-.stTabs [data-baseweb="tab"]:hover {
-    background:rgba(26,86,168,0.10) !important; color:#0d2d5e !important;
-}
+.stTabs [data-baseweb="tab"]:hover { color: #0f1923 !important; }
 .stTabs [aria-selected="true"] {
-    background:linear-gradient(135deg,#1a56a8,#0d2d5e) !important;
-    color:#fff !important;
-    box-shadow:0 3px 10px rgba(13,45,94,0.28) !important;
-}
-
-/* ── 地点列表头 ── */
-.loc-list-header {
-    background:linear-gradient(90deg,#0d2d5e,#1a56a8);
-    color:#fff; padding:8px 14px; border-radius:9px;
-    font-weight:700; font-size:13px; margin-bottom:10px;
-    letter-spacing:0.5px; box-shadow:0 2px 8px rgba(13,45,94,0.20);
+    color: #0f1923 !important;
+    border-bottom: 2px solid #c85a3a !important;
+    background: transparent !important;
+    box-shadow: none !important;
 }
 
 /* ══════════════════════════════════════════════════════
-   KPI 卡片 — 完全对齐截图四色渐变（蓝/靛/青/紫）
+   Headings
+══════════════════════════════════════════════════════ */
+h1, h2, h3, h4 {
+    color: #0f1923 !important;
+    font-weight: 700 !important;
+    letter-spacing: -0.2px;
+}
+h2 { font-size: clamp(22px, 3vw, 32px) !important; margin: 48px 0 16px !important; padding-bottom: 0 !important; border-bottom: none !important; letter-spacing: -0.3px; }
+h3 { font-size: 20px !important; margin: 32px 0 12px !important; }
+h4 { font-size: 16px !important; margin: 24px 0 10px !important; }
+hr { border-color: #eae9e4 !important; margin: 24px 0 !important; }
+
+/* ══════════════════════════════════════════════════════
+   KPI cards — drh stat-card style (flat / bordered)
 ══════════════════════════════════════════════════════ */
 .kpi-card {
-    border-radius:14px; padding:22px 16px 14px;
-    text-align:center; color:#fff; min-height:128px;
-    display:flex; flex-direction:column; align-items:center; justify-content:center;
-    position:relative; overflow:hidden; transition:transform 0.2s ease;
+    background: #fff;
+    border: 1px solid #e0ded6;
+    border-radius: 12px;
+    padding: 36px 16px 28px;
+    text-align: center;
+    color: #2a2925;
+    min-height: 140px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.3s, box-shadow 0.3s;
+    position: relative;
+    overflow: hidden;
 }
-.kpi-card:hover { transform:translateY(-3px); }
-.kpi-card::after {
-    content:''; position:absolute; right:-18px; bottom:-18px;
-    width:80px; height:80px; border-radius:50%; background:rgba(255,255,255,0.08);
+.kpi-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 40px rgba(0,0,0,0.08);
 }
-.kpi-card::before {
-    content:''; position:absolute; right:18px; bottom:8px;
-    width:46px; height:46px; border-radius:50%; background:rgba(255,255,255,0.06);
+.kpi-card::after, .kpi-card::before { display: none; }
+.kpi-icon {
+    font-size: 1.5rem;
+    color: #3d6b8e;
+    margin-bottom: 10px;
 }
-.kpi-icon { font-size:1.9rem; margin-bottom:6px; position:relative; z-index:1; }
-.kpi-num  { font-size:3.1rem; font-weight:800; line-height:1.05;
-            letter-spacing:-1px; margin:2px 0; position:relative; z-index:1; }
-.kpi-lbl  { font-size:0.88rem; font-weight:600; letter-spacing:0.6px;
-            opacity:0.88; margin-top:4px; position:relative; z-index:1; }
-.kpi-blue   { background:linear-gradient(135deg,#1a56a8 0%,#0a1f4e 100%);
-              box-shadow:0 6px 24px rgba(10,31,78,0.45); }
-.kpi-indigo { background:linear-gradient(135deg,#1e66c8 0%,#0d3d8a 100%);
-              box-shadow:0 6px 24px rgba(13,61,138,0.42); }
-.kpi-teal   { background:linear-gradient(135deg,#0891b2 0%,#0e4f80 100%);
-              box-shadow:0 6px 24px rgba(8,80,128,0.40); }
-.kpi-purple { background:linear-gradient(135deg,#2563eb 0%,#1e3a8a 100%);
-              box-shadow:0 6px 24px rgba(30,58,138,0.42); }
+.kpi-num {
+    font-size: 40px;
+    font-weight: 700;
+    color: #0f1923;
+    line-height: 1.1;
+    letter-spacing: -0.5px;
+    margin-bottom: 6px;
+}
+.kpi-lbl {
+    font-size: 14px;
+    font-weight: 600;
+    color: #3d6b8e;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    opacity: 1;
+}
+/* Flatten the legacy gradient variants; locations keeps an accent top-border */
+.kpi-blue, .kpi-indigo, .kpi-teal, .kpi-purple {
+    background: #fff !important;
+    box-shadow: none !important;
+}
+.kpi-purple { border-top: 3px solid #c85a3a !important; }
+.kpi-expand-bar { display: none; }  /* drh has no expand rail */
 
-/* 卡片下方展开条（对齐截图） */
-.kpi-expand-bar {
-    background:#fff; border:1px solid rgba(26,86,168,0.14);
-    border-top:none; border-radius:0 0 10px 10px;
-    text-align:center; margin-top:-2px; margin-bottom:12px;
+/* ══════════════════════════════════════════════════════
+   Buttons
+══════════════════════════════════════════════════════ */
+.stButton>button,
+[data-testid="stMain"] .stButton>button {
+    border-radius: 6px !important;
+    border: 1px solid #e0ded6 !important;
+    background: #fff !important;
+    color: #2a2925 !important;
+    font-weight: 600 !important;
+    font-size: 15px !important;
+    min-height: 36px !important;
+    padding: 0.3rem 0.95rem !important;
+    letter-spacing: 0.2px !important;
+    transition: all 0.2s !important;
+    box-shadow: none !important;
 }
-.kpi-expand { font-size:0.78rem; color:#1a56a8; font-weight:600; padding:7px 0; cursor:pointer; }
-.kpi-note   { font-size:0.76rem; color:#888; padding:7px 0; }
-
-/* ── 地点 Header ── */
-.loc-header {
-    background:linear-gradient(120deg,#010c1f 0%,#0b2a58 40%,#0e3570 60%,#0b2a58 100%);
-    color:#fff; border-radius:14px; padding:18px 24px;
-    margin-bottom:20px; display:flex; align-items:center;
-    gap:16px; flex-wrap:wrap;
-    border:1px solid rgba(80,150,255,0.2);
-    box-shadow:0 6px 28px rgba(2,14,40,0.30), 0 1px 0 rgba(59,125,216,0.38);
-    position:relative; overflow:hidden;
+.stButton>button:hover,
+[data-testid="stMain"] .stButton>button:hover {
+    border-color: #3d6b8e !important;
+    color: #3d6b8e !important;
+    transform: none !important;
 }
-.loc-header::before {
-    content:''; position:absolute; top:0; right:0; width:40%; height:100%;
-    background:radial-gradient(ellipse at 80% 50%,rgba(59,125,216,0.18),transparent 70%);
-    pointer-events:none;
-}
-.loc-city {
-    font-size:20px; font-weight:800; letter-spacing:1px;
-    background:linear-gradient(90deg,#fff,#cce4ff);
-    -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;
-}
-.loc-name { font-size:15px; opacity:.82; font-weight:500; }
-.loc-stat  { font-size:13px; opacity:.72; margin-left:auto; letter-spacing:0.3px; }
-
-/* ── 分类标签栏 ── */
-.sec-bar {
-    background:linear-gradient(90deg,#0d2d5e,#1a56a8,#3b7dd8);
-    color:#fff; padding:6px 16px; border-radius:8px;
-    font-weight:700; font-size:13px; margin:12px 0 8px;
-    letter-spacing:0.5px; box-shadow:0 2px 8px rgba(13,45,94,0.20);
-}
-
-/* ── 提示条 ── */
-.tip {
-    background:linear-gradient(135deg,rgba(238,242,249,0.98),rgba(187,222,251,0.38));
-    border-left:4px solid #1a56a8; border-radius:8px;
-    padding:10px 16px; font-size:13px; color:#2d4a6f;
-    margin-bottom:14px; border:1px solid rgba(26,86,168,0.12);
-}
-
-/* ── 标题 ── */
-h2,h3 { color:#0d2d5e !important; }
-h2 { padding-bottom:6px; border-bottom:2px solid rgba(26,86,168,0.18); margin-bottom:16px; }
-h3 { margin-top:22px; }
-hr { border-color:rgba(26,86,168,0.14) !important; }
-
-/* ── 主要按钮 ── */
 .stButton>button[kind="primary"] {
-    background:linear-gradient(90deg,#0d2d5e,#1a56a8) !important;
-    border:none !important; border-radius:8px !important;
-    font-weight:700 !important; letter-spacing:0.5px !important;
-    box-shadow:0 3px 12px rgba(13,45,94,0.28) !important;
-    transition:all 0.18s ease !important;
+    background: #c85a3a !important;
+    color: #fff !important;
+    border-color: #c85a3a !important;
 }
 .stButton>button[kind="primary"]:hover {
-    background:linear-gradient(90deg,#1a56a8,#3b7dd8) !important;
-    box-shadow:0 6px 20px rgba(26,86,168,0.38) !important;
-    transform:translateY(-1px) !important;
+    background: #b04e30 !important;
+    border-color: #b04e30 !important;
+    color: #fff !important;
+    transform: translateY(-1px) !important;
 }
 
-/* ── 通用按钮 ── */
-[data-testid="stMain"] .stButton>button {
-    font-size:0.85rem !important; font-weight:500 !important;
-    min-height:34px !important; padding:0.3rem 0.8rem !important;
-    color:#1a56a8 !important; background:rgba(26,86,168,0.07) !important;
-    border:1px solid rgba(26,86,168,0.26) !important; border-radius:8px !important;
-    transition:all 0.17s ease !important;
-}
-[data-testid="stMain"] .stButton>button:hover {
-    background:rgba(26,86,168,0.13) !important;
-    border-color:rgba(26,86,168,0.48) !important; transform:translateY(-1px) !important;
-}
-
-/* ── 进度条 ── */
-[data-testid="stProgressBar"]>div { background:linear-gradient(90deg,#1a56a8,#3b7dd8) !important; }
-
-/* ── Multiselect 标签 ── */
-[data-testid="stMultiSelect"] [data-baseweb="tag"] {
-    background:rgba(26,86,168,0.10) !important; border:1px solid rgba(26,86,168,0.28) !important;
-    border-radius:6px !important; font-size:0.75rem !important; color:#0d2d5e !important;
-}
-[data-testid="stMultiSelect"] label { font-size:0.80rem !important; font-weight:600 !important; color:#3d5f8f !important; }
-
-/* ── 表单 ── */
-[data-testid="stForm"] {
-    border:1px solid rgba(26,86,168,0.16); border-radius:14px;
-    padding:18px; background:rgba(250,252,255,0.97);
-    box-shadow:0 2px 10px rgba(13,45,94,0.04);
-}
-
-/* ── Border 容器 ── */
-[data-testid="stVerticalBlockBorderWrapper"] {
-    background:#fff !important; border:1px solid rgba(26,86,168,0.14) !important; border-radius:13px !important;
-}
-
-/* ── Expander ── */
+/* ══════════════════════════════════════════════════════
+   Expander / form / dataframe / metric
+══════════════════════════════════════════════════════ */
 details summary {
-    background:rgba(230,240,255,0.72) !important; border-radius:9px !important; padding:0.5rem 1rem !important;
+    background: #f4f3ef !important;
+    border-radius: 6px !important;
+    padding: 10px 14px !important;
+    font-size: 14px !important;
+    font-weight: 500 !important;
+    color: #2a2925 !important;
+    border: 1px solid #eae9e4 !important;
 }
+details[open] summary { margin-bottom: 8px; }
 
-
-/* ── Dataframe ── */
-[data-testid="stDataFrame"] { border-radius:9px !important; overflow:hidden !important; border:1px solid rgba(26,86,168,0.13) !important; }
-
-/* ── 图片 meta ── */
-.img-card-meta { padding:6px 10px 8px; font-size:0.72rem; color:#2a4a7f; line-height:1.55; }
-.img-card-meta b { color:#0d2d5e; }
-
-/* ── Metric ── */
+[data-testid="stForm"] {
+    border: 1px solid #e0ded6;
+    border-radius: 12px;
+    padding: 24px;
+    background: #fff;
+    box-shadow: none;
+}
+[data-testid="stVerticalBlockBorderWrapper"] {
+    background: #fff !important;
+    border: 1px solid #e0ded6 !important;
+    border-radius: 12px !important;
+}
+[data-testid="stDataFrame"] {
+    border-radius: 8px !important;
+    overflow: hidden;
+    border: 1px solid #e0ded6 !important;
+}
 [data-testid="stMetric"] {
-    background:linear-gradient(135deg,rgba(238,242,249,0.92),rgba(187,222,251,0.55));
-    border-radius:12px; padding:16px 20px;
-    border:1px solid rgba(26,86,168,0.14); box-shadow:0 2px 10px rgba(13,45,94,0.07);
+    background: #fff;
+    border-radius: 12px;
+    padding: 20px 24px;
+    border: 1px solid #e0ded6;
+    box-shadow: none;
 }
-[data-testid="stMetricLabel"] p { color:#1a56a8 !important; font-weight:600; }
-[data-testid="stMetricValue"]   { color:#0d2d5e !important; }
+[data-testid="stMetricLabel"] p {
+    color: #3d6b8e !important;
+    font-weight: 600;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+[data-testid="stMetricValue"] {
+    color: #0f1923 !important;
+    font-weight: 700;
+}
+[data-testid="stProgressBar"]>div { background: #c85a3a !important; }
 
-/* ── Caption ── */
-.stCaption { color:#3d5f8f !important; }
+/* Multiselect / selectbox tokens */
+[data-testid="stMultiSelect"] [data-baseweb="tag"] {
+    background: #eae9e4 !important;
+    border: 1px solid #e0ded6 !important;
+    color: #2a2925 !important;
+    border-radius: 4px !important;
+    font-size: 12px !important;
+}
+[data-testid="stMultiSelect"] label,
+[data-testid="stSelectbox"] label {
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    color: #5a5850 !important;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+}
+
+/* ══════════════════════════════════════════════════════
+   Schema section bar / location cards / tip box
+══════════════════════════════════════════════════════ */
+.sec-bar {
+    background: transparent;
+    color: #0f1923;
+    padding: 0 0 8px;
+    border-bottom: 2px solid #c85a3a;
+    font-size: 15px;
+    font-weight: 700;
+    margin: 24px 0 12px;
+    display: inline-block;
+}
+.loc-list-header {
+    background: #0f1923;
+    color: #faf9f5;
+    padding: 10px 16px;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 13px;
+    margin-bottom: 14px;
+    letter-spacing: 0.3px;
+}
+.loc-header {
+    background: #0f1923;
+    color: #faf9f5;
+    border-radius: 12px;
+    padding: 20px 24px;
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+    border: none;
+    box-shadow: none;
+}
+.loc-header::before, .loc-header::after { display: none; }
+.loc-city {
+    font-size: 20px;
+    font-weight: 700;
+    color: #faf9f5;
+    background: none;
+    -webkit-text-fill-color: initial;
+    letter-spacing: 0;
+}
+.loc-name { font-size: 15px; opacity: 0.75; font-weight: 500; }
+.loc-stat { font-size: 13px; opacity: 0.65; margin-left: auto; }
+
+.tip {
+    background: #f4f3ef;
+    border: 1px solid #eae9e4;
+    border-left: 3px solid #c85a3a;
+    border-radius: 6px;
+    padding: 10px 14px;
+    font-size: 13px;
+    color: #5a5850;
+    margin-bottom: 14px;
+}
+
+.img-card-meta { padding: 6px 10px 8px; font-size: 12px; color: #5a5850; line-height: 1.55; }
+.img-card-meta b { color: #0f1923; font-weight: 600; }
+
+.stCaption { color: #5a5850 !important; }
+
+/* Remove the brand-header / tc-tl / tc-br leftovers from v3 template */
+.brand-header, .brand-logo, .brand-text, .brand-title, .brand-sub, .brand-badge,
+.tc-tl, .tc-br { display: none !important; }
+@keyframes header-sweep { 0%{} 100%{} }
+@keyframes title-glow   { 0%{} 100%{} }
+@keyframes pulse-badge  { 0%{} 100%{} }
 </style>
 """
 
@@ -1998,47 +2125,61 @@ def main():
 
     st.set_page_config(
         page_title=T("驭研科技大规模自然驾驶数据集统计平台"),
-        page_icon="🛰️",
+        # Favicon — hosted on driveresearch.tech for visual consistency
+        # with the main website tab icon.
+        page_icon="https://driveresearch.tech/images/logo-square.png",
         layout="wide",
         initial_sidebar_state="collapsed",
     )
     st.markdown(CSS, unsafe_allow_html=True)
     init_db()
 
-    # ── Brand Header + 语言切换 ──
-    # 用 Streamlit columns 把右上角的 EN / 中文 toggle 固定到 header
-    title_zh = "驭研科技大规模自然驾驶数据集统计平台"
-    title_en = "DRIVEResearch · Large-Scale Naturalistic Driving Dataset Platform"
-    display_title = title_en if st.session_state.lang == "en" else title_zh
-    badge_text = "🗺️ Aerial · ODD Labeling"
+    # ══════════════════════════════════════════════════════
+    # Nav — 视觉与 driveresearch.tech 对齐
+    #   · 固定顶栏，solid navy
+    #   · 左上：官网 logo-white.png（点击回官网）
+    #   · 中：导航链接（Main site / Dashboard / Tagging / GitHub）
+    #   · 右：语言切换 pill（EN / 中文）
+    #
+    # 为了配合 Streamlit 的渲染顺序，nav 内部的语言按钮用 st.radio
+    # 置于其下的一行 1-column，通过 CSS 把它"吸到"nav 右上角。
+    # ══════════════════════════════════════════════════════
+    main_site_label = "Main site" if st.session_state.lang == "en" else "主站"
+    dash_label      = "Dashboard" if st.session_state.lang == "en" else "看板"
+    tag_label       = "Tagging"   if st.session_state.lang == "en" else "标注"
+    gh_label        = "GitHub"
 
     st.markdown(f"""
-<div class="brand-header">
-  <div class="tc-tl"></div><div class="tc-br"></div>
-  <div class="brand-logo">🛰️</div>
-  <div class="brand-text">
-    <div class="brand-title">{display_title}</div>
-    <div class="brand-sub">DRIVEResearch · Operational Design Domain Labeling Platform</div>
+<nav class="drh-nav">
+  <div class="drh-nav-inner">
+    <a href="https://driveresearch.tech/" target="_blank" rel="noopener" class="drh-nav-logo">
+      <img src="https://driveresearch.tech/images/logo-white.png" alt="DRIVEResearch">
+    </a>
+    <ul class="drh-nav-links">
+      <li><a href="https://driveresearch.tech/" target="_blank" rel="noopener">{main_site_label}</a></li>
+      <li><a href="#dashboard" class="active">{dash_label}</a></li>
+      <li><a href="#tagging">{tag_label}</a></li>
+      <li><a href="https://github.com/AutoZYX/NDS-Label-Platform" target="_blank" rel="noopener">{gh_label}</a></li>
+    </ul>
+    <div class="drh-nav-lang-slot"></div>
   </div>
-  <div class="brand-badge">{badge_text}</div>
-</div>
+</nav>
 """, unsafe_allow_html=True)
 
-    # Language toggle — 右上对齐
-    _sp, _tog = st.columns([10, 1])
-    with _tog:
-        new_lang = st.radio(
-            " ",
-            options=["zh", "en"],
-            format_func=lambda x: "中文" if x == "zh" else "EN",
-            index=0 if st.session_state.lang == "zh" else 1,
-            horizontal=True,
-            label_visibility="collapsed",
-            key="_lang_picker",
-        )
-        if new_lang != st.session_state.lang:
-            st.session_state.lang = new_lang
-            st.rerun()
+    # Language toggle — 通过 key="_lang_picker" 让 Streamlit 生成
+    # `.st-key-_lang_picker` class，再在 CSS 里 fixed 到 nav 右上角。
+    new_lang = st.radio(
+        " ",
+        options=["zh", "en"],
+        format_func=lambda x: "中文" if x == "zh" else "EN",
+        index=0 if st.session_state.lang == "zh" else 1,
+        horizontal=True,
+        label_visibility="collapsed",
+        key="_lang_picker",
+    )
+    if new_lang != st.session_state.lang:
+        st.session_state.lang = new_lang
+        st.rerun()
 
     tab1, tab2 = st.tabs([T("📊 统计看板"), T("🏷️ 地点标注")])
     with tab1:
