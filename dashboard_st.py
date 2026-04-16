@@ -2475,11 +2475,16 @@ details[open] summary { margin-bottom: 8px; }
 """
 
 # ─── 页面 4：AI 智能问答（Claude API） ────────────────────────────────
+_QA_PROMPT_VERSION = "v3-cjk-bold-strict-2026-04-17"
+
 def _build_qa_system_prompt() -> str:
     """Build a compact system prompt with dataset schema + live stats.
-    Cached at session level to avoid regenerating on every rerun."""
-    if "_qa_sys" in st.session_state:
-        return st.session_state["_qa_sys"]
+    Cached at session level to avoid regenerating on every rerun.
+    Cache key includes _QA_PROMPT_VERSION so prompt updates invalidate
+    stale cached copies even within a long-running session."""
+    cache_key = f"_qa_sys::{_QA_PROMPT_VERSION}"
+    if cache_key in st.session_state:
+        return st.session_state[cache_key]
     try:
         df = load_df()
     except Exception:
@@ -2512,30 +2517,44 @@ ODD tag dimensions available for analysis (sub-category · attribute):
 2. When quoting numbers, use the live statistics above.
 3. When users ask open-ended research/methodology questions (e.g. "Is this enough data for XX?", "Which scenarios are missing?"), give reasoned judgment grounded in the statistics above — do not refuse.
 
-## Markdown formatting rules (IMPORTANT — CJK-aware bold)
+## Markdown formatting rules — CJK bold is broken by default (CRITICAL)
 
-When you use **bold** in your answer, the `**` asterisks MUST NOT be adjacent to any punctuation; otherwise Markdown will render the asterisks as literal characters instead of bolding the text. The following pairs are especially common offenders with Chinese text:
+This app's frontend is Streamlit, which uses a strict CommonMark parser. In Chinese text, inline `**bold**` FAILS in almost all cases because CJK characters and Chinese full-width punctuation (`，。：；"「」《》`) are NOT recognized as word boundaries by CommonMark. Both sides of `**` need ASCII-level boundaries.
 
-- Chinese quotes: 「」『』 " " ' '
-- Chinese brackets: （）【】〔〕
-- Book title marks: 《》〈〉
-- Chinese punctuation: ：、，。；！？
-- English quotes / brackets / punctuation: " ' () [] : , . ; ! ?
+### Rule for Chinese answers (DEFAULT: DO NOT use inline bold)
 
-Always move punctuation OUTSIDE the asterisks.
+**In a Chinese response, DO NOT use `**text**` inline within a sentence.** It will render as literal asterisks and look unprofessional. Instead:
 
-Wrong examples (will NOT bold):
-- **"重点"** → renders as literal `**"重点"**`
-- **《标准号》** → renders as literal
-- **Key point:** → EN punctuation also affected
+1. **Prefer structure over bold** — use numbered lists, headings (`###`), or em-dash separators:
+   - ❌ `ODD 标签维度采样**最稀疏**的是 3.3 动物。`
+   - ✅ `ODD 标签维度采样最稀疏的是：\n\n1. 3.3 动物·类型 — 几乎无样本\n2. 3.5 事故车辆·类型 — 事故场景罕见`
+   - ✅ `### 采样最稀疏的维度\n\n1. 3.3 动物·类型 — ...`
 
-Correct examples:
-- "**重点**"
-- 《**标准号**》
-- **Key point**:
+2. **If you must bold, put it on its own line** with blank lines above and below (so both sides of `**` are newlines):
+   ```
+   前一段文字。
 
-If in doubt, prefer plain text over bold rather than risk broken rendering."""
-    st.session_state["_qa_sys"] = prompt
+   **关键结论**
+
+   下一段解释。
+   ```
+
+3. **List item start is OK** — `- **术语** — 解释` works because the ` ` before `**` and ` — ` after are ASCII whitespace + ASCII punctuation.
+
+4. **Never put `**` directly between Chinese characters/punctuation on either side.**
+
+### Rule for English answers (standard Markdown applies)
+
+In English, `**bold**` works normally because words are separated by ASCII spaces. Use it freely.
+
+### Additional rules for Chinese formatting
+
+- Chinese quotes (`"..."`, `「...」`) are fine as plain text emphasis and always render correctly — prefer them over bold when in doubt.
+- Code/numbers wrapped in backticks (`` ` ``) work in CJK without issue — use for standard numbers, IDs, tag keys.
+- Headings (`##`, `###`) always work.
+
+Your goal: a Chinese response that renders cleanly with ZERO literal `**` visible."""
+    st.session_state[cache_key] = prompt
     return prompt
 
 
