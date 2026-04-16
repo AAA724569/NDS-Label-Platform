@@ -57,6 +57,7 @@ I18N_EN = {
     "看板":       "Dashboard",
     "标注":       "Tagging",
     "智能问答":   "AI Q&A",
+    "返回主站":   "Back to main site",
 
     # ── Tagging 页 · 列表与进度 ───────────────────────────────
     "进度":        "Progress",
@@ -67,7 +68,11 @@ I18N_EN = {
     "张代表图":    "representative frames",
     "总时长":      "total duration",
     "已标注":      "labeled",
+    "已标":        "done",
+    "图":          "Frame ",  # for "Frame 1", "Frame 2" etc.
     "未找到索引文件": "Index file not found",
+    "💾 保存":     "💾 Save",
+    "💾 保存动态标签": "💾 Save dynamic tags",
 
     # ── Tagging 页 · 详情右侧 ─────────────────────────────────
     "📍 静态标签（整个地点）":     "📍 Static tags (whole location)",
@@ -958,8 +963,8 @@ def page_label():
                 badge = "✅" if n_day_done == len(dreps) else ("🔶" if n_day_done > 0 else "⬜")
 
                 with st.expander(
-                    f"{badge}  {day['date_display']}  ·  {fmt_dur(day['total_duration'])} 总时长"
-                    f"  ·  {len(dreps)} 张  ({n_day_done}/{len(dreps)} 已标)",
+                    f"{badge}  {day['date_display']}  ·  {fmt_dur(day['total_duration'])} {T('总时长')}"
+                    f"  ·  {len(dreps)} {T('张')}  ({n_day_done}/{len(dreps)} {T('已标')})",
                     expanded=(n_day_done < len(dreps))
                 ):
                     img_cols = st.columns(len(dreps))
@@ -980,7 +985,7 @@ def page_label():
                         fp      = rep["folder_path"]
                         is_done = fp in labeled_fps
                         with st.expander(
-                            f"{'✅' if is_done else '⬜'} 图{ri+1} · "
+                            f"{'✅' if is_done else '⬜'} {T('图')}{ri+1} · "
                             f"{rep.get('collection_time','')} · {fmt_dur(rep.get('duration',0))}",
                             expanded=not is_done
                         ):
@@ -1260,7 +1265,8 @@ def page_dashboard():
                                    key="dc", format_func=T)
         with _dc3:
             sel_r = st.multiselect(T("道路主类"), sorted(df["top_road_category"].dropna().unique()),
-                                   default=sorted(df["top_road_category"].dropna().unique()), key="dr")
+                                   default=sorted(df["top_road_category"].dropna().unique()),
+                                   key="dr", format_func=T)
 
     # ── 高级筛选 ──
     def _tag_vals(col_df, sec, sub, attr):
@@ -1291,19 +1297,19 @@ def page_dashboard():
         bank_opts   = _tag_vals(df, T("一、道路静态环境"), T("1.3 道路几何"),       T("横坡"))
         edge_opts   = _tag_vals(df, T("一、道路静态环境"), T("1.5 道路边缘"),       T("边缘类型"))
 
-        with _r1c1: sel_sub      = st.multiselect(T("道路子类"),   sub_opts,    default=sub_opts,    key="adv_sub")
-        with _r1c2: sel_cross    = st.multiselect(T("交叉类型"),   cross_opts,  default=cross_opts,  key="adv_cross")
-        with _r1c3: sel_lane_n   = st.multiselect(T("车道数量"),   lane_n_opts, default=lane_n_opts, key="adv_lane_n")
-        with _r1c4: sel_lane_t   = st.multiselect(T("车道类型"),   lane_t_opts, default=lane_t_opts, key="adv_lane_t")
-        with _r2c1: sel_lane_w   = st.multiselect(T("车道宽度"),   lane_w_opts, default=lane_w_opts, key="adv_lane_w")
-        with _r2c2: sel_surf     = st.multiselect(T("路面类型"),   surf_opts,   default=surf_opts,   key="adv_surf")
-        with _r2c3: sel_surf_s   = st.multiselect(T("路面状态"),   surf_s_opts, default=surf_s_opts, key="adv_surf_s")
-        with _r2c4: sel_edge     = st.multiselect(T("道路边缘"),   edge_opts,   default=edge_opts,   key="adv_edge")
+        with _r1c1: sel_sub      = st.multiselect(T("道路子类"),   sub_opts,    default=sub_opts, format_func=T, key="adv_sub")
+        with _r1c2: sel_cross    = st.multiselect(T("交叉类型"),   cross_opts,  default=cross_opts, format_func=T, key="adv_cross")
+        with _r1c3: sel_lane_n   = st.multiselect(T("车道数量"),   lane_n_opts, default=lane_n_opts, format_func=T, key="adv_lane_n")
+        with _r1c4: sel_lane_t   = st.multiselect(T("车道类型"),   lane_t_opts, default=lane_t_opts, format_func=T, key="adv_lane_t")
+        with _r2c1: sel_lane_w   = st.multiselect(T("车道宽度"),   lane_w_opts, default=lane_w_opts, format_func=T, key="adv_lane_w")
+        with _r2c2: sel_surf     = st.multiselect(T("路面类型"),   surf_opts,   default=surf_opts, format_func=T, key="adv_surf")
+        with _r2c3: sel_surf_s   = st.multiselect(T("路面状态"),   surf_s_opts, default=surf_s_opts, format_func=T, key="adv_surf_s")
+        with _r2c4: sel_edge     = st.multiselect(T("道路边缘"),   edge_opts,   default=edge_opts, format_func=T, key="adv_edge")
 
         _r3c1, _r3c2, _r3c3 = st.columns(3)
-        with _r3c1: sel_slope    = st.multiselect(T("坡度"),       slope_opts,  default=slope_opts,  key="adv_slope")
-        with _r3c2: sel_curv     = st.multiselect(T("曲率"),       curv_opts,   default=curv_opts,   key="adv_curv")
-        with _r3c3: sel_bank     = st.multiselect(T("横坡"),       bank_opts,   default=bank_opts,   key="adv_bank")
+        with _r3c1: sel_slope    = st.multiselect(T("坡度"),       slope_opts,  default=slope_opts, format_func=T, key="adv_slope")
+        with _r3c2: sel_curv     = st.multiselect(T("曲率"),       curv_opts,   default=curv_opts, format_func=T, key="adv_curv")
+        with _r3c3: sel_bank     = st.multiselect(T("横坡"),       bank_opts,   default=bank_opts, format_func=T, key="adv_bank")
 
         st.divider()
         # ── 二、交通设施 ──────────────────────────────────────────
@@ -1316,11 +1322,11 @@ def page_dashboard():
         fac_opts    = _tag_vals(df, T("二、交通设施"), T("2.2 路侧与周边环境"), T("设施"))
         spec_opts   = _tag_vals(df, T("二、交通设施"), T("2.3 特殊设施"),       T("类型"))
 
-        with _r4c1: sel_sig      = st.multiselect(T("信号灯"),     sig_opts,   default=sig_opts,   key="adv_sig")
-        with _r4c2: sel_sign     = st.multiselect(T("标志牌"),     sign_opts,  default=sign_opts,  key="adv_sign")
-        with _r4c3: sel_mark     = st.multiselect(T("地面标线"),   mark_opts,  default=mark_opts,  key="adv_mark")
-        with _r4c4: sel_spec     = st.multiselect(T("特殊设施"),   spec_opts,  default=spec_opts,  key="adv_spec")
-        sel_fac = st.multiselect(T("路侧设施"), fac_opts, default=fac_opts, key="adv_fac")
+        with _r4c1: sel_sig      = st.multiselect(T("信号灯"),     sig_opts,   default=sig_opts, format_func=T, key="adv_sig")
+        with _r4c2: sel_sign     = st.multiselect(T("标志牌"),     sign_opts,  default=sign_opts, format_func=T, key="adv_sign")
+        with _r4c3: sel_mark     = st.multiselect(T("地面标线"),   mark_opts,  default=mark_opts, format_func=T, key="adv_mark")
+        with _r4c4: sel_spec     = st.multiselect(T("特殊设施"),   spec_opts,  default=spec_opts, format_func=T, key="adv_spec")
+        sel_fac = st.multiselect(T("路侧设施"), fac_opts, default=fac_opts, format_func=T, key="adv_fac")
 
         st.divider()
         # ── 三、动态目标 ──────────────────────────────────────────
@@ -1331,9 +1337,9 @@ def page_dashboard():
         vru_opts    = _tag_vals(df, T("三、动态目标 (路面状况)"), "3.2 VRU",      T("类型"))
         obs_opts    = _tag_vals(df, T("三、动态目标 (路面状况)"), T("3.4 障碍物"),   T("类型"))
 
-        with _r5c1: sel_mv       = st.multiselect(T("机动车类型"), mv_opts,    default=mv_opts,    key="adv_mv")
-        with _r5c2: sel_vru      = st.multiselect(T("VRU 类型"),   vru_opts,   default=vru_opts,   key="adv_vru")
-        with _r5c3: sel_obs      = st.multiselect(T("障碍物"),     obs_opts,   default=obs_opts,   key="adv_obs")
+        with _r5c1: sel_mv       = st.multiselect(T("机动车类型"), mv_opts,    default=mv_opts, format_func=T, key="adv_mv")
+        with _r5c2: sel_vru      = st.multiselect(T("VRU 类型"),   vru_opts,   default=vru_opts, format_func=T, key="adv_vru")
+        with _r5c3: sel_obs      = st.multiselect(T("障碍物"),     obs_opts,   default=obs_opts, format_func=T, key="adv_obs")
 
         st.divider()
         # ── 四、大气环境 + 时段 ───────────────────────────────────
@@ -1345,11 +1351,11 @@ def page_dashboard():
         lumi_opts   = _tag_vals(df, T("四、大气环境"), T("4.3 光照"),  T("强度"))
         temp_opts   = _tag_vals(df, T("四、大气环境"), T("4.4 气温"),  T("估算"))
 
-        with _r6c1: sel_wth      = st.multiselect(T("天气"),       wth_opts,   default=wth_opts,   key="adv_wth")
-        with _r6c2: sel_light    = st.multiselect(T("光照来源"),   light_opts, default=light_opts, key="adv_light")
-        with _r6c3: sel_lumi     = st.multiselect(T("光照强度"),   lumi_opts,  default=lumi_opts,  key="adv_lumi")
-        with _r6c4: sel_temp     = st.multiselect(T("气温"),       temp_opts,  default=temp_opts,  key="adv_temp")
-        with _r6c5: sel_period   = st.multiselect(T("采集时段"),   PERIOD_ORDER, default=PERIOD_ORDER, key="adv_period")
+        with _r6c1: sel_wth      = st.multiselect(T("天气"),       wth_opts,   default=wth_opts, format_func=T, key="adv_wth")
+        with _r6c2: sel_light    = st.multiselect(T("光照来源"),   light_opts, default=light_opts, format_func=T, key="adv_light")
+        with _r6c3: sel_lumi     = st.multiselect(T("光照强度"),   lumi_opts,  default=lumi_opts, format_func=T, key="adv_lumi")
+        with _r6c4: sel_temp     = st.multiselect(T("气温"),       temp_opts,  default=temp_opts, format_func=T, key="adv_temp")
+        with _r6c5: sel_period   = st.multiselect(T("采集时段"),   PERIOD_ORDER, default=PERIOD_ORDER, format_func=T, key="adv_period")
 
     def _tag_match(tags, sec, sub, attr, allowed):
         v = extract_tag(tags, sec, sub, attr)
@@ -1554,7 +1560,7 @@ def page_dashboard():
     )
     # Build option labels with T() per component; indices in TAG_PATHS are preserved
     tag_opts = [f"{T(sub)} · {T(attr)}" for _, sub, attr in TAG_PATHS]
-    sel_tag  = st.selectbox(T("标签维度"), tag_opts, key="dash_tag")
+    sel_tag  = st.selectbox(T("标签维度"), tag_opts, format_func=T, key="dash_tag")
     sec, sub, attr = TAG_PATHS[tag_opts.index(sel_tag)]
     items = []
     for d in df_f["_tags"]:
@@ -1595,8 +1601,8 @@ def page_dashboard():
             ("top_road_subcategory",T("道路子类")),("period",T("时段"))]
     lbls, keys = [v for _,v in DIMS], [k for k,_ in DIMS]
     dc1, dc2 = st.columns(2)
-    with dc1: s1 = st.selectbox(T("维度 1"), lbls, key="cx1")
-    with dc2: s2 = st.selectbox(T("维度 2"), lbls, index=1, key="cx2")
+    with dc1: s1 = st.selectbox(T("维度 1"), lbls, format_func=T, key="cx1")
+    with dc2: s2 = st.selectbox(T("维度 2"), lbls, index=1, format_func=T, key="cx2")
     k1, k2 = keys[lbls.index(s1)], keys[lbls.index(s2)]
     if k1 != k2 and all(k in df_f.columns for k in (k1, k2)):
         pivot = df_f.groupby([k1, k2]).size().unstack(fill_value=0)
@@ -2276,14 +2282,89 @@ details[open] summary { margin-bottom: 8px; }
 }
 [data-testid="stProgressBar"]>div { background: #c85a3a !important; }
 
-/* Multiselect / selectbox tokens */
+/* ══════════════════════════════════════════════════════
+   Multiselect / Selectbox — drh light palette
+   替代 Streamlit 默认黑底，使用官网米白 / 灰系 / 橙红 focus
+══════════════════════════════════════════════════════ */
+/* Outer select control (the container that used to be black) */
+[data-testid="stMultiSelect"] [data-baseweb="select"] > div,
+[data-testid="stSelectbox"]   [data-baseweb="select"] > div {
+    background: #faf9f5 !important;          /* drh cream */
+    border: 1.5px solid #e0ded6 !important;
+    border-radius: 10px !important;
+    min-height: 40px !important;
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+/* Hover */
+[data-testid="stMultiSelect"] [data-baseweb="select"] > div:hover,
+[data-testid="stSelectbox"]   [data-baseweb="select"] > div:hover {
+    border-color: #c85a3a !important;        /* accent on hover */
+}
+/* Focus / expanded (BaseWeb toggles aria-expanded on the open state) */
+[data-testid="stMultiSelect"] [data-baseweb="select"][aria-expanded="true"] > div,
+[data-testid="stSelectbox"]   [data-baseweb="select"][aria-expanded="true"] > div {
+    border-color: #c85a3a !important;
+    box-shadow: 0 0 0 3px rgba(200, 90, 58, 0.12) !important;
+}
+/* Typed text + caret inside the select input */
+[data-testid="stMultiSelect"] input,
+[data-testid="stSelectbox"]   input {
+    color: #2a2925 !important;
+    caret-color: #c85a3a !important;
+}
+/* Placeholder / displayed value color */
+[data-testid="stMultiSelect"] [data-baseweb="select"] [class*="placeholder"],
+[data-testid="stSelectbox"]   [data-baseweb="select"] [class*="placeholder"] {
+    color: #8a8880 !important;
+}
+/* Dropdown chevron */
+[data-testid="stMultiSelect"] [data-baseweb="select"] svg,
+[data-testid="stSelectbox"]   [data-baseweb="select"] svg {
+    color: #5a5850 !important;
+    fill: #5a5850 !important;
+}
+/* Selected item chips inside multiselect */
 [data-testid="stMultiSelect"] [data-baseweb="tag"] {
     background: #eae9e4 !important;
-    border: 1px solid #e0ded6 !important;
+    border: 1px solid #d6d4cc !important;
     color: #2a2925 !important;
-    border-radius: 4px !important;
+    border-radius: 999px !important;          /* pill shape */
     font-size: 12px !important;
+    font-weight: 500 !important;
+    padding: 2px 4px 2px 10px !important;
 }
+[data-testid="stMultiSelect"] [data-baseweb="tag"] span[role="button"] {
+    color: #8a8880 !important;
+    transition: color 0.15s;
+}
+[data-testid="stMultiSelect"] [data-baseweb="tag"] span[role="button"]:hover {
+    color: #c85a3a !important;
+}
+/* Dropdown popover (the "No results" / option list that appears on open) */
+[data-baseweb="popover"] [data-baseweb="menu"],
+[data-baseweb="popover"] ul[role="listbox"] {
+    background: #ffffff !important;
+    border: 1px solid #e0ded6 !important;
+    border-radius: 10px !important;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.08) !important;
+}
+[data-baseweb="popover"] li[role="option"] {
+    color: #2a2925 !important;
+    font-size: 13px !important;
+    padding: 8px 14px !important;
+}
+[data-baseweb="popover"] li[role="option"]:hover,
+[data-baseweb="popover"] li[role="option"][aria-selected="true"] {
+    background: #f4f3ef !important;
+    color: #0f1923 !important;
+}
+/* "No results" inline state */
+[data-baseweb="popover"] [class*="no-results" i],
+[data-baseweb="popover"] div:not([role]) {
+    color: #8a8880 !important;
+}
+
+/* Labels above the select control */
 [data-testid="stMultiSelect"] label,
 [data-testid="stSelectbox"] label {
     font-size: 13px !important;
@@ -2547,13 +2628,12 @@ def main():
     # ══════════════════════════════════════════════════════
     # Nav — 视觉与 driveresearch.tech 对齐
     #   · 固定顶栏，solid navy
-    #   · 左上：官网 logo-white.png（点击回官网）
-    #   · 中：导航链接（Main site / Dashboard / Tagging / AI Q&A / GitHub）
+    #   · 左上：官网 logo-white.png（点击回官网 — 取代了多余的 "Main site" 链接）
+    #   · 中：导航链接（Dashboard / Tagging / AI Q&A / GitHub）
     #   · 右：语言切换 pill（EN / 中文）
     # ══════════════════════════════════════════════════════
     lang = st.session_state.lang
-    main_site_label = "Main site" if lang == "en" else "主站"
-    gh_label        = "GitHub"
+    gh_label = "GitHub"
 
     # Build nav items from PAGES registry so adding a page updates nav automatically.
     # Encode lang in URL so a hard reload (nav link click) preserves language.
@@ -2566,11 +2646,11 @@ def main():
     st.markdown(f"""
 <nav class="drh-nav">
   <div class="drh-nav-inner">
-    <a href="https://driveresearch.tech/" target="_blank" rel="noopener" class="drh-nav-logo">
+    <a href="https://driveresearch.tech/" target="_blank" rel="noopener" class="drh-nav-logo"
+       title="{T('返回主站')}">
       <img src="https://driveresearch.tech/images/logo-white.png" alt="DRIVEResearch">
     </a>
     <ul class="drh-nav-links">
-      <li><a href="https://driveresearch.tech/" target="_blank" rel="noopener">{main_site_label}</a></li>
       {nav_li}
       <li><a href="https://github.com/AutoZYX/NDS-Label-Platform" target="_blank" rel="noopener">{gh_label}</a></li>
     </ul>
