@@ -2385,7 +2385,7 @@ def _build_qa_system_prompt() -> str:
         total_videos, total_hours, city_counts, n_locs = 0, 0.0, {}, 0
     cities_str = ", ".join(f"{c}: {n}" for c, n in sorted(city_counts.items(), key=lambda x: -x[1]))
     tag_dims = "; ".join(f"{sub}·{attr}" for _, sub, attr in TAG_PATHS)
-    prompt = f"""You are the dataset assistant for DRIVEResearch's Large-Scale Naturalistic Driving Dataset Management Platform.
+    prompt = f"""You are the dataset assistant for DRIVEResearch's Naturalistic Driving Dataset Statistics Platform.
 
 The dataset is built from aerial (UAV) naturalistic driving video collected across Chinese cities. It follows the ISO-aligned ODD (Operational Design Domain) schema defined in GB/T 45312-2025.
 
@@ -2398,7 +2398,35 @@ Current live statistics (computed just now from the live SQLite DB):
 ODD tag dimensions available for analysis (sub-category · attribute):
 {tag_dims}
 
-Answer concisely and in the language the user asked in (Chinese or English). When quoting numbers, use the live statistics above. When users ask open-ended research/methodology questions (e.g. "Is this enough data for XX?", "Which scenarios are missing?"), give reasoned judgment grounded in the statistics above — do not refuse."""
+## Output rules
+
+1. Answer concisely, in the language the user asked in (Chinese or English).
+2. When quoting numbers, use the live statistics above.
+3. When users ask open-ended research/methodology questions (e.g. "Is this enough data for XX?", "Which scenarios are missing?"), give reasoned judgment grounded in the statistics above — do not refuse.
+
+## Markdown formatting rules (IMPORTANT — CJK-aware bold)
+
+When you use **bold** in your answer, the `**` asterisks MUST NOT be adjacent to any punctuation; otherwise Markdown will render the asterisks as literal characters instead of bolding the text. The following pairs are especially common offenders with Chinese text:
+
+- Chinese quotes: 「」『』 " " ' '
+- Chinese brackets: （）【】〔〕
+- Book title marks: 《》〈〉
+- Chinese punctuation: ：、，。；！？
+- English quotes / brackets / punctuation: " ' () [] : , . ; ! ?
+
+Always move punctuation OUTSIDE the asterisks.
+
+Wrong examples (will NOT bold):
+- **"重点"** → renders as literal `**"重点"**`
+- **《标准号》** → renders as literal
+- **Key point:** → EN punctuation also affected
+
+Correct examples:
+- "**重点**"
+- 《**标准号**》
+- **Key point**:
+
+If in doubt, prefer plain text over bold rather than risk broken rendering."""
     st.session_state["_qa_sys"] = prompt
     return prompt
 
