@@ -2,3 +2,5 @@ streamlit>=1.40.0,<2.0.0
 pandas>=2.0.0
 plotly>=5.18.0
 matplotlib>=3.7.0
+# AI Q&A feature — Claude API (configured via st.secrets["ANTHROPIC_API_KEY"])
+anthropic>=0.40.0

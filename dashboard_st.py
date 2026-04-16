@@ -43,6 +43,38 @@ I18N_EN = {
     "🖼️ 图片": "🖼️ Photos",
     "📋 原始数据": "📋 Raw Data",
 
+    # ── 平台标题 ──────────────────────────────────────────────
+    "驭研科技大规模自然驾驶数据集数据管理平台":
+        "DRIVEResearch Large-Scale Naturalistic Driving Dataset Management Platform",
+    "驭研科技大规模自然驾驶数据集统计平台":
+        "DRIVEResearch Large-Scale Naturalistic Driving Dataset Management Platform",
+
+    # ── 顶部导航（nav）────────────────────────────────────────
+    "主站":       "Main site",
+    "看板":       "Dashboard",
+    "标注":       "Tagging",
+    "智能问答":   "AI Q&A",
+
+    # ── AI Q&A 页面 ───────────────────────────────────────────
+    "🤖 智能问答":            "🤖 AI Q&A",
+    "基于 Claude 的数据集对话助手，可解答数据覆盖范围、ODD 标签分布、采集地点等问题":
+        "Claude-powered dataset assistant. Ask about coverage, ODD tag distribution, collection sites, and more.",
+    "请输入你的问题…":        "Ask a question about the dataset…",
+    "📨 发送":                "📨 Send",
+    "🤖 正在思考…":            "🤖 Thinking…",
+    "请先在 Streamlit Cloud 的 Secrets 里配置 `ANTHROPIC_API_KEY`":
+        "Please configure `ANTHROPIC_API_KEY` in Streamlit Cloud Secrets first.",
+    "问题不能为空":            "Question cannot be empty",
+    "问题过长（限 500 字）":   "Question too long (max 500 chars)",
+    "调用 Claude API 失败": "Claude API call failed",
+    "⚠️ 本小时请求已达上限（20 次），请稍后再试":
+        "⚠️ Hourly request limit reached (20). Please try again later.",
+    "示例问题":              "Example questions",
+    "数据集一共覆盖了哪些城市？":        "Which cities does the dataset cover?",
+    "长春的数据为什么占比这么高？":      "Why does Changchun make up such a large share?",
+    "哪些 ODD 标签维度采样最稀疏？":    "Which ODD tag dimensions have the sparsest samples?",
+    "高速公路和城市道路的时长分布如何？":"How is duration split between freeway and urban roads?",
+
     # ── KPI 卡片 ──────────────────────────────────────────────
     "视频总数": "Total Videos",
     "覆盖城市": "Cities",
@@ -1497,19 +1529,24 @@ def page_dashboard():
         if v: items.extend(v)
     if items:
         cnt = pd.Series(items).value_counts().reset_index()
-        cnt.columns = [T("标签值"),T("数量")]
-        ct = st.radio(T("图表类型"), [T("柱状图"),T("饼图")], horizontal=True, key="dchart")
-        if ct == "饼图":
-            fig = px.pie(cnt, values="数量", names="标签值",
-                         title=f"{sub} · {attr}", color_discrete_sequence=BLUE, hole=0.38)
+        # Keep internal column names stable (English) — px.bar/px.pie reference
+        # these directly. Display labels are set via layout.xaxis_title etc.
+        cnt.columns = ["tag_value", "count"]
+        chart_types = [T("柱状图"), T("饼图")]
+        ct = st.radio(T("图表类型"), chart_types, horizontal=True, key="dchart")
+        title_txt = f"{T(sub)} · {T(attr)}"
+        if ct == chart_types[1]:  # 饼图 / Pie
+            fig = px.pie(cnt, values="count", names="tag_value",
+                         title=title_txt, color_discrete_sequence=BLUE, hole=0.38)
             fig.update_traces(texttemplate="%{label}<br>%{percent:.1%}",
                               textposition="outside", textfont=dict(size=11), pull=[0.03]*len(cnt))
-        else:
-            fig = px.bar(cnt, x="标签值", y="数量", text="数量", color="标签值",
-                         color_discrete_sequence=BLUE, title=f"{sub} · {attr}")
+        else:  # 柱状图 / Bar
+            fig = px.bar(cnt, x="tag_value", y="count", text="count", color="tag_value",
+                         color_discrete_sequence=BLUE, title=title_txt)
             fig.update_traces(textposition="outside", textfont=dict(size=11, color="#0d2d5e"),
                               marker_line_width=0, opacity=0.88)
-            fig.update_layout(**_cl(), showlegend=False, xaxis_tickangle=-30)
+            fig.update_layout(**_cl(), showlegend=False, xaxis_tickangle=-30,
+                              xaxis_title=T("标签值"), yaxis_title=T("数量"))
         fig.update_layout(**_cl())
         st.plotly_chart(fig, use_container_width=True)
     else:
@@ -1846,6 +1883,65 @@ section[data-testid="stMain"]        { padding-top: 0 !important; }
 .drh-nav-links a:hover  { opacity: 1; color: #faf9f5; }
 .drh-nav-links a.active { opacity: 1; color: #e8a08c; }
 .drh-nav-lang-slot      { width: 110px; }
+
+/* ── 平台全名标题条 ───────────────────────────────────────── */
+.platform-title {
+    text-align: center;
+    padding: 18px 20px 14px;
+    margin: 0 0 24px;
+    border-bottom: 1px solid #eae9e4;
+    color: #0f1923;
+    font-size: clamp(15px, 2.2vw, 20px);
+    font-weight: 600;
+    letter-spacing: 0.4px;
+    line-height: 1.45;
+}
+@media (max-width: 640px) {
+    .platform-title { font-size: 13px; padding: 12px 16px 10px; }
+}
+
+/* ── AI Q&A 页面 ──────────────────────────────────────────── */
+.qa-hero {
+    padding: 8px 0 18px;
+    border-bottom: 1px solid #eae9e4;
+    margin-bottom: 24px;
+}
+.qa-hero h2 {
+    font-size: clamp(22px, 3vw, 30px);
+    font-weight: 700;
+    margin: 0 0 6px;
+    color: #0f1923;
+    letter-spacing: -0.5px;
+}
+.qa-hero p {
+    font-size: 14px;
+    color: #5a5850;
+    margin: 0;
+    line-height: 1.55;
+}
+.qa-answer {
+    background: #f4f3ef;
+    border: 1px solid #eae9e4;
+    border-left: 3px solid #c85a3a;
+    border-radius: 8px;
+    padding: 18px 22px;
+    color: #2a2925;
+    line-height: 1.7;
+    font-size: 15px;
+    margin-top: 18px;
+    white-space: pre-wrap;
+}
+.qa-example-card {
+    display: inline-block;
+    padding: 8px 14px;
+    margin: 4px 6px 4px 0;
+    background: #faf9f5;
+    border: 1px solid #e0ded6;
+    border-radius: 999px;
+    color: #5a5850;
+    font-size: 13px;
+    cursor: pointer;
+}
 
 /* ── 响应式 · 平板 ── */
 @media (max-width: 900px) {
@@ -2237,14 +2333,139 @@ details[open] summary { margin-bottom: 8px; }
 </style>
 """
 
+# ─── 页面 4：AI 智能问答（Claude API） ────────────────────────────────
+def _build_qa_system_prompt() -> str:
+    """Build a compact system prompt with dataset schema + live stats.
+    Cached at session level to avoid regenerating on every rerun."""
+    if "_qa_sys" in st.session_state:
+        return st.session_state["_qa_sys"]
+    try:
+        df = load_df()
+    except Exception:
+        df = pd.DataFrame()
+    try:
+        total_videos = int(len(df))
+        total_hours  = float(df["duration"].sum() / 60) if "duration" in df.columns else 0.0
+        city_counts  = df["city"].value_counts().to_dict() if "city" in df.columns else {}
+        n_locs       = int(df["location_name"].nunique()) if "location_name" in df.columns else 0
+    except Exception:
+        total_videos, total_hours, city_counts, n_locs = 0, 0.0, {}, 0
+    cities_str = ", ".join(f"{c}: {n}" for c, n in sorted(city_counts.items(), key=lambda x: -x[1]))
+    tag_dims = "; ".join(f"{sub}·{attr}" for _, sub, attr in TAG_PATHS)
+    prompt = f"""You are the dataset assistant for DRIVEResearch's Large-Scale Naturalistic Driving Dataset Management Platform.
+
+The dataset is built from aerial (UAV) naturalistic driving video collected across Chinese cities. It follows the ISO-aligned ODD (Operational Design Domain) schema defined in GB/T 45312-2025.
+
+Current live statistics (computed just now from the live SQLite DB):
+- Total videos: {total_videos}
+- Total duration: {total_hours:.1f} hours
+- Distinct locations: {n_locs}
+- Per-city video counts: {cities_str}
+
+ODD tag dimensions available for analysis (sub-category · attribute):
+{tag_dims}
+
+Answer concisely and in the language the user asked in (Chinese or English). When quoting numbers, use the live statistics above. When users ask open-ended research/methodology questions (e.g. "Is this enough data for XX?", "Which scenarios are missing?"), give reasoned judgment grounded in the statistics above — do not refuse."""
+    st.session_state["_qa_sys"] = prompt
+    return prompt
+
+
+def page_qa():
+    # Hero
+    st.markdown(f"""<div class="qa-hero">
+  <h2>{T("🤖 智能问答")}</h2>
+  <p>{T("基于 Claude 的数据集对话助手，可解答数据覆盖范围、ODD 标签分布、采集地点等问题")}</p>
+</div>""", unsafe_allow_html=True)
+
+    # API key gate — wrap in try/except because accessing st.secrets when
+    # no secrets.toml exists at all raises StreamlitSecretNotFoundError.
+    api_key = None
+    try:
+        api_key = st.secrets.get("ANTHROPIC_API_KEY")
+    except Exception:
+        api_key = os.environ.get("ANTHROPIC_API_KEY")  # dev fallback
+    if not api_key:
+        st.warning(T("请先在 Streamlit Cloud 的 Secrets 里配置 `ANTHROPIC_API_KEY`"))
+        st.code('ANTHROPIC_API_KEY = "sk-ant-..."', language="toml")
+        return
+
+    # Simple in-session rate limit (20 requests/session)
+    if "_qa_count" not in st.session_state:
+        st.session_state["_qa_count"] = 0
+
+    # Example chips
+    examples = [
+        T("数据集一共覆盖了哪些城市？"),
+        T("长春的数据为什么占比这么高？"),
+        T("哪些 ODD 标签维度采样最稀疏？"),
+        T("高速公路和城市道路的时长分布如何？"),
+    ]
+    st.caption(T("示例问题"))
+    ex_cols = st.columns(len(examples))
+    picked_example = None
+    for i, (c, q) in enumerate(zip(ex_cols, examples)):
+        with c:
+            if st.button(q, key=f"qa_ex_{i}", use_container_width=True):
+                picked_example = q
+
+    # Input area
+    default_q = picked_example or st.session_state.get("_qa_pending", "")
+    q = st.text_area(T("请输入你的问题…"),
+                     value=default_q, height=90, key="_qa_input",
+                     label_visibility="collapsed",
+                     placeholder=T("请输入你的问题…"))
+    col_a, col_b = st.columns([1, 5])
+    with col_a:
+        submit = st.button(T("📨 发送"), type="primary", use_container_width=True)
+
+    # Handle submit
+    if submit or picked_example:
+        question = (picked_example or q or "").strip()
+        if not question:
+            st.error(T("问题不能为空")); return
+        if len(question) > 500:
+            st.error(T("问题过长（限 500 字）")); return
+        if st.session_state["_qa_count"] >= 20:
+            st.error(T("⚠️ 本小时请求已达上限（20 次），请稍后再试")); return
+
+        with st.spinner(T("🤖 正在思考…")):
+            try:
+                from anthropic import Anthropic
+                client = Anthropic(api_key=api_key)
+                msg = client.messages.create(
+                    model="claude-sonnet-4-5",
+                    max_tokens=1024,
+                    system=_build_qa_system_prompt(),
+                    messages=[{"role": "user", "content": question}],
+                )
+                answer = msg.content[0].text if msg.content and msg.content[0].type == "text" else ""
+                st.session_state["_qa_count"] += 1
+                st.markdown(f'<div class="qa-answer">{answer}</div>', unsafe_allow_html=True)
+            except Exception as e:
+                st.error(f"{T('调用 Claude API 失败')}: {e}")
+
+
 # ─── 主入口 ──────────────────────────────────────────────────────────
+# URL-driven pages (via st.query_params):
+#   ?page=dashboard  (default)
+#   ?page=tagging
+#   ?page=qa
+# Top-nav links set `?page=…`, clearing Streamlit's hash-based state so
+# navigation actually switches pages rather than no-op'ing.
+PAGES = {
+    "dashboard": {"zh": "看板",      "en": "Dashboard", "render": lambda: page_dashboard()},
+    "tagging":   {"zh": "标注",      "en": "Tagging",   "render": lambda: page_label()},
+    "qa":        {"zh": "智能问答",  "en": "AI Q&A",    "render": lambda: page_qa()},
+}
+
+
 def main():
     # ── 语言默认值 ──
     if "lang" not in st.session_state:
         st.session_state.lang = "zh"
 
     st.set_page_config(
-        page_title=T("驭研科技大规模自然驾驶数据集统计平台"),
+        page_title=T("驭研科技大规模自然驾驶数据集数据管理平台"),
         # Favicon — hosted on driveresearch.tech for visual consistency
         # with the main website tab icon.
         page_icon="https://driveresearch.tech/images/logo-square.png",
@@ -2254,20 +2475,34 @@ def main():
     st.markdown(CSS, unsafe_allow_html=True)
     init_db()
 
+    # ── Routing via query params (survives hard reload from nav link clicks) ──
+    qp = st.query_params
+    active = qp.get("page", "dashboard")
+    if active not in PAGES:
+        active = "dashboard"
+    # If URL carries ?lang=en/zh, honor it (so nav clicks preserve language)
+    qp_lang = qp.get("lang")
+    if qp_lang in ("zh", "en") and st.session_state.lang != qp_lang:
+        st.session_state.lang = qp_lang
+
     # ══════════════════════════════════════════════════════
     # Nav — 视觉与 driveresearch.tech 对齐
     #   · 固定顶栏，solid navy
     #   · 左上：官网 logo-white.png（点击回官网）
-    #   · 中：导航链接（Main site / Dashboard / Tagging / GitHub）
+    #   · 中：导航链接（Main site / Dashboard / Tagging / AI Q&A / GitHub）
     #   · 右：语言切换 pill（EN / 中文）
-    #
-    # 为了配合 Streamlit 的渲染顺序，nav 内部的语言按钮用 st.radio
-    # 置于其下的一行 1-column，通过 CSS 把它"吸到"nav 右上角。
     # ══════════════════════════════════════════════════════
-    main_site_label = "Main site" if st.session_state.lang == "en" else "主站"
-    dash_label      = "Dashboard" if st.session_state.lang == "en" else "看板"
-    tag_label       = "Tagging"   if st.session_state.lang == "en" else "标注"
+    lang = st.session_state.lang
+    main_site_label = "Main site" if lang == "en" else "主站"
     gh_label        = "GitHub"
+
+    # Build nav items from PAGES registry so adding a page updates nav automatically.
+    # Encode lang in URL so a hard reload (nav link click) preserves language.
+    nav_li = "".join(
+        f'<li><a href="?page={key}&lang={lang}" target="_self" '
+        f'class="{"active" if key == active else ""}">{meta[lang]}</a></li>'
+        for key, meta in PAGES.items()
+    )
 
     st.markdown(f"""
 <nav class="drh-nav">
@@ -2277,8 +2512,7 @@ def main():
     </a>
     <ul class="drh-nav-links">
       <li><a href="https://driveresearch.tech/" target="_blank" rel="noopener">{main_site_label}</a></li>
-      <li><a href="#dashboard" class="active">{dash_label}</a></li>
-      <li><a href="#tagging">{tag_label}</a></li>
+      {nav_li}
       <li><a href="https://github.com/AutoZYX/NDS-Label-Platform" target="_blank" rel="noopener">{gh_label}</a></li>
     </ul>
     <div class="drh-nav-lang-slot"></div>
@@ -2299,13 +2533,19 @@ def main():
     )
     if new_lang != st.session_state.lang:
         st.session_state.lang = new_lang
+        # Persist lang into URL so nav clicks on hard-reload keep it
+        st.query_params["lang"] = new_lang
+        st.query_params["page"] = active
         st.rerun()
 
-    tab1, tab2 = st.tabs([T("📊 统计看板"), T("🏷️ 地点标注")])
-    with tab1:
-        page_dashboard()
-    with tab2:
-        page_label()
+    # ── 平台全名 · 中英双语（按当前 lang 显示）──
+    st.markdown(
+        f'<div class="platform-title">{T("驭研科技大规模自然驾驶数据集数据管理平台")}</div>',
+        unsafe_allow_html=True,
+    )
+
+    # ── Render active page ──
+    PAGES[active]["render"]()
 
 
 if __name__ == "__main__":
