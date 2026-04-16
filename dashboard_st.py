@@ -349,6 +349,22 @@ def _t_schema(schema):
             out[T(k)] = T(v) if isinstance(v, str) else v
     return out
 
+def section_header(title_zh: str, title_en: str, sub_zh: str = "", sub_en: str = ""):
+    """Render a driveresearch.tech-style section header: clean h2 title +
+    optional subtitle, left-aligned, with an accent underline bar. Drops
+    emoji to match the main-site's neutral typography."""
+    lang = st.session_state.get("lang", "zh")
+    title = title_en if lang == "en" else title_zh
+    sub   = (sub_en if lang == "en" else sub_zh) or ""
+    sub_html = f'<p class="dash-section-sub">{sub}</p>' if sub else ""
+    st.markdown(
+        f'''<div class="dash-section">
+              <h2 class="dash-section-title">{title}</h2>
+              {sub_html}
+            </div>''',
+        unsafe_allow_html=True,
+    )
+
 # ─── 路径常量 ─────────────────────────────────────────────────────────
 _BASE = Path(__file__).parent
 INDEX_FILE   = _BASE / "sessions_index.json"
@@ -1390,13 +1406,19 @@ def page_dashboard():
     st.divider()
 
     # ── 地域与时间分布 ──
-    st.markdown(T("### 📍 地域与时间分布"))
+    section_header(
+        "地域与时间分布", "Geographic & Temporal Distribution",
+        "覆盖 8 座城市、5 个采集时段的分布概览",
+        "Coverage across 8 cities and 5 collection-time windows",
+    )
     c1, c2 = st.columns(2)
     with c1:
         cd = df_f.groupby("city").agg(数量=("id","count")).reset_index()
+        cd["city_display"] = cd["city"].apply(T)  # translate tick labels at plot time
         if not cd.empty:
-            fig = px.bar(cd, x="city", y="数量", text="数量", color="city",
-                         color_discrete_sequence=BLUE, title=T("各城市标注数量"), labels={"city":T("城市")})
+            fig = px.bar(cd, x="city_display", y="数量", text="数量", color="city_display",
+                         color_discrete_sequence=BLUE, title=T("各城市标注数量"),
+                         labels={"city_display": T("城市"), "数量": T("数量")})
             fig.update_traces(textposition="outside", textfont=dict(size=11, color="#0d2d5e"),
                               marker_line_width=0, opacity=0.88)
             fig.update_layout(**_cl(), showlegend=False)
@@ -1414,21 +1436,32 @@ def page_dashboard():
             st.plotly_chart(fig, use_container_width=True)
 
     # ── 采集时段 ──
-    st.markdown(T("### 🕐 采集时段分布"))
+    section_header(
+        "采集时段分布", "Collection Time Distribution",
+        "按早高峰 / 日常 / 晚高峰 / 夜间 切分",
+        "Split by morning peak / daytime / evening peak / night windows",
+    )
     df_f["period"] = df_f["_period"]
     pd_df = df_f.groupby("period").size().reset_index(name="数量")
     pd_df["_o"] = pd_df["period"].apply(lambda x: PERIOD_ORDER.index(x) if x in PERIOD_ORDER else 99)
     pd_df = pd_df.sort_values("_o").drop(columns=["_o"])
+    pd_df["period_display"] = pd_df["period"].apply(T)
     if not pd_df.empty:
-        fig = px.bar(pd_df, x="period", y="数量", text="数量", color="period",
-                     color_discrete_sequence=BLUE, title=T("采集时段分布"), labels={"period":T("时段")})
+        fig = px.bar(pd_df, x="period_display", y="数量", text="数量", color="period_display",
+                     color_discrete_sequence=BLUE, title=T("采集时段分布"),
+                     labels={"period_display": T("时段"), "数量": T("数量")},
+                     category_orders={"period_display": pd_df["period_display"].tolist()})
         fig.update_traces(textposition="outside", textfont=dict(size=11, color="#0d2d5e"),
                           marker_line_width=0, opacity=0.88)
         fig.update_layout(**_cl(), showlegend=False)
         st.plotly_chart(fig, use_container_width=True)
 
     # ── 道路类型旭日图 ──
-    st.markdown(T("### 🛣️ 道路类型分布"))
+    section_header(
+        "道路类型分布", "Road Type Distribution",
+        "对齐 GB/T 45312-2025 ODD 三级分类的数据覆盖",
+        "GB/T 45312-2025 three-level road-type coverage",
+    )
     top_df = df_f[df_f["top_road_category"].notna() & (df_f["top_road_category"] != "")]
     if not top_df.empty:
         rows = []
@@ -1439,6 +1472,9 @@ def page_dashboard():
                              "子类":row.get("top_road_subcategory",""),"交叉类型":ct})
         if rows:
             sb = pd.DataFrame(rows).groupby(["主类","子类","交叉类型"]).size().reset_index(name="数量")
+            # Pre-translate ring labels so EN mode shows English in every segment
+            for _col in ("主类", "子类", "交叉类型"):
+                sb[_col] = sb[_col].apply(T)
             fig = px.sunburst(sb, path=["主类","子类","交叉类型"], values="数量",
                               title=T("道路类型层级分布"), color_discrete_sequence=BLUE)
             fig.update_traces(textfont=dict(size=11))
@@ -1446,8 +1482,13 @@ def page_dashboard():
             st.plotly_chart(fig, use_container_width=True)
 
     # ── 标签分布 ──
-    st.markdown(T("### 🏷️ 标签分布"))
-    tag_opts = [f"{sub} · {attr}" for _, sub, attr in TAG_PATHS]
+    section_header(
+        "标签分布", "Tag Distribution",
+        "按任意 ODD 标签维度查看数据密度",
+        "Data density across any ODD tag dimension",
+    )
+    # Build option labels with T() per component; indices in TAG_PATHS are preserved
+    tag_opts = [f"{T(sub)} · {T(attr)}" for _, sub, attr in TAG_PATHS]
     sel_tag  = st.selectbox(T("标签维度"), tag_opts, key="dash_tag")
     sec, sub, attr = TAG_PATHS[tag_opts.index(sel_tag)]
     items = []
@@ -1475,7 +1516,11 @@ def page_dashboard():
         st.info(T("该维度暂无数据"))
 
     # ── 交叉分析 ──
-    st.markdown(T("### 📈 交叉分析"))
+    section_header(
+        "交叉分析", "Cross Analysis",
+        "两维标签交叉聚合，快速定位样本稀疏的场景组合",
+        "Two-dimension tag cross-aggregation; spot scenarios with sparse samples",
+    )
     DIMS = [("city",T("城市")),("top_road_category",T("道路主类")),
             ("top_road_subcategory",T("道路子类")),("period",T("时段"))]
     lbls, keys = [v for _,v in DIMS], [k for k,_ in DIMS]
@@ -1802,6 +1847,28 @@ section[data-testid="stMain"]        { padding-top: 0 !important; }
 .drh-nav-links a.active { opacity: 1; color: #e8a08c; }
 .drh-nav-lang-slot      { width: 110px; }
 
+/* ── 响应式 · 平板 ── */
+@media (max-width: 900px) {
+    .drh-nav-inner { padding: 0 16px; gap: 12px; }
+    .drh-nav-links { gap: 20px; }
+    .drh-nav-links a { font-size: 14px; }
+    .drh-nav-logo img { height: 32px; }
+}
+/* ── 响应式 · 手机 ── */
+@media (max-width: 640px) {
+    .drh-nav { height: 56px; }
+    .drh-nav-inner { height: 56px; padding: 0 12px; gap: 8px; }
+    .drh-nav-logo img { height: 26px; }
+    /* 手机上隐藏中部链接，只保留 logo + 语言切换，避免挤爆 */
+    .drh-nav-links { display: none; }
+    .drh-nav-lang-slot { width: auto; }
+    .st-key-_lang_picker { top: 10px !important; right: 12px !important; }
+    .st-key-_lang_picker [role="radiogroup"] > label { padding: 2px 9px !important; }
+    .st-key-_lang_picker [role="radiogroup"] > label p { font-size: 11px !important; }
+    /* Content 区再紧凑一些 */
+    .block-container { padding: 72px 16px 48px !important; }
+}
+
 /* 语言切换 pill — Streamlit 给 key=_lang_picker 的 container 加了
    `.st-key-_lang_picker`；我们 fixed 到 nav 右上，风格对齐官网 pill */
 .st-key-_lang_picker {
@@ -1847,6 +1914,26 @@ section[data-testid="stMain"]        { padding-top: 0 !important; }
 }
 
 /* ══════════════════════════════════════════════════════
+   响应式：让 st.columns 在手机上换行（默认是 flex nowrap）
+══════════════════════════════════════════════════════ */
+@media (max-width: 640px) {
+    [data-testid="stHorizontalBlock"] {
+        flex-wrap: wrap !important;
+    }
+    [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {
+        min-width: 45% !important;   /* 2 卡/行 */
+        flex: 1 1 45% !important;
+    }
+    .kpi-card { padding: 28px 12px 22px; min-height: 120px; }
+    .kpi-num  { font-size: 32px; }
+    .kpi-lbl  { font-size: 12px; }
+    .kpi-icon { font-size: 1.2rem; margin-bottom: 6px; }
+    h2 { font-size: 20px !important; margin: 32px 0 12px !important; }
+    h3 { font-size: 17px !important; margin: 24px 0 10px !important; }
+    .stTabs [data-baseweb="tab"] { padding: 10px 12px !important; font-size: 14px !important; }
+}
+
+/* ══════════════════════════════════════════════════════
    Tabs — flat underline like drh nav-links
 ══════════════════════════════════════════════════════ */
 .stTabs [data-baseweb="tab-list"] {
@@ -1887,6 +1974,39 @@ h2 { font-size: clamp(22px, 3vw, 32px) !important; margin: 48px 0 16px !importan
 h3 { font-size: 20px !important; margin: 32px 0 12px !important; }
 h4 { font-size: 16px !important; margin: 24px 0 10px !important; }
 hr { border-color: #eae9e4 !important; margin: 24px 0 !important; }
+
+/* ══════════════════════════════════════════════════════
+   Dashboard section title (drh-style: clean h2 + subtitle)
+══════════════════════════════════════════════════════ */
+.dash-section {
+    margin: 72px 0 24px;
+    padding-top: 8px;
+    border-top: 1px solid #eae9e4;
+}
+.dash-section:first-of-type { border-top: none; padding-top: 0; margin-top: 40px; }
+.dash-section-title {
+    font-size: clamp(22px, 2.6vw, 28px) !important;
+    font-weight: 700 !important;
+    color: #0f1923 !important;
+    letter-spacing: -0.3px;
+    margin: 0 0 8px !important;
+    padding: 0 !important;
+    border: none !important;
+    line-height: 1.25;
+}
+.dash-section-sub {
+    font-size: 14px;
+    color: #5a5850;
+    line-height: 1.6;
+    margin: 0 0 24px;
+    max-width: 720px;
+    letter-spacing: 0.1px;
+}
+@media (max-width: 640px) {
+    .dash-section { margin: 48px 0 16px; }
+    .dash-section-title { font-size: 20px !important; }
+    .dash-section-sub { font-size: 13px; margin-bottom: 18px; }
+}
 
 /* ══════════════════════════════════════════════════════
    KPI cards — drh stat-card style (flat / bordered)
