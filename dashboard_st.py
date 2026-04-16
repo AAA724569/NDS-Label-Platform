@@ -22,6 +22,333 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
+# ═══════════════════════════════════════════════════════════════════════
+# i18n · 中英文切换
+# ───────────────────────────────────────────────────────────────────────
+# 架构：
+#   1. 所有面向用户的中文字符串通过 T("中文") 查找英文翻译，未命中时
+#      原样返回（安全降级）。
+#   2. 当前语言保存在 st.session_state.lang ∈ {"zh", "en"}，默认 "zh"。
+#   3. 顶部 brand header 提供 EN / 中文 切换按钮。
+#   4. ODD 分类体系的 dict key（如 "一、道路静态环境"）保持中文不变，
+#      仅在显示时通过 T() 翻译；这样数据库路径、schema 查询逻辑全部
+#      不受影响。
+# ═══════════════════════════════════════════════════════════════════════
+I18N_EN = {
+    # ── 品牌 / 导航 ───────────────────────────────────────────
+    "驭研科技大规模自然驾驶数据集统计平台": "DRIVEResearch · Large-Scale Naturalistic Driving Dataset Platform",
+    "📊 统计看板": "📊 Dashboard",
+    "🏷️ 地点标注": "🏷️ Location Tagging",
+    "📹 视频 / 场景列表": "📹 Videos / Scenes",
+    "🖼️ 图片": "🖼️ Photos",
+    "📋 原始数据": "📋 Raw Data",
+
+    # ── KPI 卡片 ──────────────────────────────────────────────
+    "视频总数": "Total Videos",
+    "覆盖城市": "Cities",
+    "总时长（小时）": "Total Duration (hours)",
+    "总时长": "Total Duration",
+    "地点数": "Locations",
+    "数据总量": "Dataset Size",
+    "图片地点数": "Photo Locations",
+    "视频总时长 (分钟)": "Total Video Duration (min)",
+    "含图片数据集": "Incl. photo datasets",
+    "场景数": "Scenes",
+
+    # ── 筛选栏 ────────────────────────────────────────────────
+    "🔄 刷新数据": "🔄 Refresh",
+    "🔍 筛选条件": "🔍 Filters",
+    "⚙️ 高级筛选": "⚙️ Advanced Filters",
+    "🌆 城市过滤": "🌆 City filter",
+    "城市": "City",
+    "道路主类": "Road category",
+    "道路子类": "Road subcategory",
+    "主类": "Category",
+    "子类": "Subcategory",
+    "年份": "Year",
+    "来源": "Source",
+    "标签维度": "Tag dimension",
+    "标签值": "Tag value",
+    "图表类型": "Chart type",
+    "柱状图": "Bar",
+    "饼图": "Pie",
+
+    # ── Section 标题 ──────────────────────────────────────────
+    "📍 地域与时间分布": "📍 Geographic & Temporal Distribution",
+    "🕐 采集时段分布": "🕐 Collection Time Distribution",
+    "🛣️ 道路类型分布": "🛣️ Road Type Distribution",
+    "🏷️ 标签分布": "🏷️ Tag Distribution",
+    "📈 交叉分析": "📈 Cross Analysis",
+    "#### 🌆 各城市概览": "#### 🌆 Cities Overview",
+    "#### 📍 地点卡片墙": "#### 📍 Locations Wall",
+    "#### 📋 基本信息": "#### 📋 Basic Info",
+    "#### 📍 静态标签": "#### 📍 Static Tags",
+    "#### 🎬 动态标签": "#### 🎬 Dynamic Tags",
+    "#### 📹 视频 / 场景列表": "#### 📹 Videos / Scenes",
+    "#### 🖼️ 图片": "#### 🖼️ Photos",
+    "#### 🛣️ 道路类型": "#### 🛣️ Road Type",
+    "### 🏷️ 标签分布": "### 🏷️ Tag Distribution",
+    "### 📈 交叉分析": "### 📈 Cross Analysis",
+    "### 📍 地域与时间分布": "### 📍 Geographic & Temporal Distribution",
+    "### 🕐 采集时段分布": "### 🕐 Collection Time Distribution",
+    "### 🛣️ 道路类型分布": "### 🛣️ Road Type Distribution",
+
+    # ── 图表坐标/标签 ────────────────────────────────────────
+    "各城市标注数量": "Records per city",
+    "各地点视频总时长 (Top 15)": "Total duration per location (Top 15)",
+    "道路类型层级分布": "Hierarchical road-type distribution",
+    "采集时段分布": "Collection time distribution",
+    "数量": "Count",
+    "时长 (h)": "Duration (h)",
+    "时长(h)": "Duration (h)",
+    "时长": "Duration",
+    "时段": "Time period",
+    "地点": "Location",
+    "维度 1": "Dimension 1",
+    "维度 2": "Dimension 2",
+    "该维度暂无数据": "No data for this dimension",
+
+    # ── 时段 ──────────────────────────────────────────────────
+    "早高峰 (07-09)": "Morning peak (07–09)",
+    "晚高峰 (17-19)": "Evening peak (17–19)",
+    "夜间 (19-07)": "Night (19–07)",
+    "日常规": "Daytime",
+    "未知": "Unknown",
+    "采集时段": "Time period",
+    "采集时间": "Collected at",
+    "采集日期": "Collection date",
+    "采集小时": "Collection hour",
+
+    # ── 状态 / 提示 ──────────────────────────────────────────
+    "✅ 已保存": "✅ Saved",
+    "未标注": "Unlabeled",
+    "🖼 图片不存在": "🖼 Image not found",
+    "← 从左侧列表中选择一个地点开始标注": "← Select a location on the left to begin tagging",
+    "数据库暂无数据，请先完成标注": "Database is empty. Complete labeling first.",
+    "地点数据不存在": "Location data not found",
+    "地点名称不能为空": "Location name cannot be empty",
+    "暂无图片地点数据。请先运行 `python step3_photo_label.py` 完成自动标注。":
+        "No photo-location data yet. Run `python step3_photo_label.py` first.",
+
+    # ── 按钮 / 控件 ──────────────────────────────────────────
+    "▸ 展开详情": "▸ Details",
+    "▸ 查看标签": "▸ View tags",
+    "▾ 收起": "▾ Collapse",
+    "💾 保存": "💾 Save",
+    "💾 保存复核": "💾 Save review",
+    "💾 保存新地点": "💾 Save new location",
+    "手动录入": "Manual entry",
+    "手动标注": "Manual label",
+    "VLM自动": "VLM auto",
+    "上传图片": "Upload image",
+    "上传代表图 (JPG/PNG)": "Upload representative frame (JPG/PNG)",
+    "查看/编辑标签": "View / edit tags",
+    "图片来源": "Image source",
+    "图片绝对路径": "Absolute image path",
+    "输入路径": "Enter path",
+    "地点名称 (英文/编号)": "Location name (English / ID)",
+    "估算": "Estimated",
+    "备注": "Notes",
+    "填写一次后保存到本地点所有代表图。": "Fill once; saves to all frames at this location.",
+    "静态标签会自动沿用（请先完成静态标签）。": "Static tags are inherited (complete static tags first).",
+    "🎬 动态标签（逐图）": "🎬 Dynamic tags (per frame)",
+    "📍 静态标签（整个地点）": "📍 Static tags (whole location)",
+    "🛣️ 道路类型": "🛣️ Road type",
+
+    # ── ODD Schema top level ─────────────────────────────────
+    "一、道路静态环境": "Ⅰ. Static road environment",
+    "二、交通设施": "Ⅱ. Traffic facilities",
+    "三、动态目标": "Ⅲ. Dynamic targets",
+    "三、动态目标 (路面状况)": "Ⅲ. Dynamic targets (road state)",
+    "四、大气环境": "Ⅳ. Atmospheric environment",
+    "四、大气环境 & 采集时段": "Ⅳ. Atmospheric environment & time",
+    "🛣️ 一、道路静态环境": "🛣️ Ⅰ. Static road environment",
+    "🚦 二、交通设施": "🚦 Ⅱ. Traffic facilities",
+    "🚗 三、动态目标": "🚗 Ⅲ. Dynamic targets",
+    "🌤️ 四、大气环境": "🌤️ Ⅳ. Atmospheric environment",
+    "**一、道路静态环境**": "**Ⅰ. Static road environment**",
+    "**二、交通设施**": "**Ⅱ. Traffic facilities**",
+    "**三、动态目标**": "**Ⅲ. Dynamic targets**",
+    "**四、大气环境 & 采集时段**": "**Ⅳ. Atmospheric environment & time**",
+
+    # ── ODD Schema sub-sections ──────────────────────────────
+    "1.2 道路表面": "1.2 Road surface",
+    "1.3 道路几何": "1.3 Road geometry",
+    "1.4 包含车道特征": "1.4 Lane features",
+    "1.5 道路边缘": "1.5 Road edge",
+    "1.6 道路交叉": "1.6 Road intersection",
+    "2.1 交通控制": "2.1 Traffic control",
+    "2.2 路侧与周边环境": "2.2 Roadside & surroundings",
+    "2.3 特殊设施": "2.3 Special facilities",
+    "3.1 机动车": "3.1 Motor vehicle",
+    "3.3 动物": "3.3 Animal",
+    "3.4 障碍物": "3.4 Obstacle",
+    "3.5 事故车辆": "3.5 Accident vehicle",
+    "4.1 天气": "4.1 Weather",
+    "4.2 颗粒物": "4.2 Particulates",
+    "4.3 光照": "4.3 Lighting",
+    "4.4 气温": "4.4 Temperature",
+
+    # ── Schema attribute keys ────────────────────────────────
+    "表面类型": "Surface type",
+    "表面状态": "Surface state",
+    "坡度": "Slope",
+    "曲率": "Curvature",
+    "横坡": "Cross slope",
+    "最宽车道数量": "Max lane count",
+    "车道数量": "Lane count",
+    "车道类型": "Lane type",
+    "车道宽度": "Lane width",
+    "边缘类型": "Edge type",
+    "交叉类型": "Intersection type",
+    "信号灯": "Traffic light",
+    "标志牌": "Sign",
+    "地面标签": "Ground marking",
+    "地面标线": "Road marking",
+    "设施": "Facilities",
+    "类型": "Type",
+    "强度": "Intensity",
+    "光照强度": "Light intensity",
+    "光照来源": "Light source",
+    "路面状态": "Road state",
+    "路面类型": "Road surface",
+    "机动车类型": "Motor vehicle type",
+    "VRU 类型": "VRU type",
+
+    # ── Road categories (TOP_LEVEL_CONFIG) ───────────────────
+    "区域": "Area",
+    "封闭园区": "Closed campus",
+    "交通管制区域": "Traffic-controlled area",
+    "开放道路": "Open road",
+    "城市道路": "Urban road",
+    "快速路": "Urban expressway",
+    "主干路": "Arterial",
+    "次干路": "Sub-arterial",
+    "支路": "Local road",
+    "街巷": "Alley",
+    "公路": "Highway",
+    "高速公路": "Freeway",
+    "高速路": "Freeway",
+    "一级公路": "Class-1 highway",
+    "二级公路": "Class-2 highway",
+    "三级公路": "Class-3 highway",
+    "四级公路": "Class-4 highway",
+    "乡村道路": "Rural road",
+    "村道": "Village road",
+    "其他乡村内部道路": "Other rural road",
+    "其他道路": "Other roads",
+    "厂矿": "Industrial / mining",
+    "林区": "Forest",
+    "港口": "Port",
+    "专用道路": "Dedicated road",
+    "停车区域": "Parking",
+    "室内停车场": "Indoor parking lot",
+    "室外停车场": "Outdoor parking lot",
+    "路侧停车位": "Roadside parking",
+    "自动驾驶场景": "AD scenario",
+    "封闭场景": "Closed scenario",
+    "半封闭场景": "Semi-closed scenario",
+    "开放场景": "Open scenario",
+
+    # ── Schema values ────────────────────────────────────────
+    "沥青": "Asphalt", "混凝土": "Concrete", "土路": "Dirt",
+    "碎石": "Gravel", "冰雪路面": "Snow / ice", "金属板": "Metal plate",
+    "平路": "Flat", "上坡": "Uphill", "下坡": "Downhill", "起伏路": "Undulating",
+    "直线": "Straight",
+    "弯道 (曲率<0.01)": "Curve (κ<0.01)",
+    "弯道 (0.01<曲率<0.05)": "Curve (0.01<κ<0.05)",
+    "弯道 (曲率>0.05)": "Curve (κ>0.05)",
+    "正常排水坡度": "Normal drainage", "反超高": "Reverse superelevation", "无横坡": "None",
+    "单车道": "Single lane", "双车道": "Two lanes", "三车道": "Three lanes",
+    "四车道及以上": "Four+ lanes",
+    "普通车道": "Regular lane", "公交专用道": "Bus lane",
+    "潮汐车道": "Reversible lane", "应急车道": "Emergency lane",
+    "非机动车道": "Non-motor lane", "人行道": "Sidewalk",
+    "汇入匝道": "Merge ramp", "汇出匝道": "Diverge ramp",
+    "标准": "Standard", "狭窄": "Narrow", "超宽": "Wide",
+    "路缘石": "Curb", "护栏 (金属)": "Barrier (metal)",
+    "护栏 (混凝土)": "Barrier (concrete)", "草地/泥土": "Grass / dirt",
+    "无物理隔离": "No physical barrier",
+    "路段 (无交叉)": "Segment (no intersection)",
+    "平面交叉 (十字)": "At-grade (4-way)",
+    "平面交叉 (丁字)": "At-grade (T-junction)",
+    "平面交叉 (畸形)": "At-grade (irregular)",
+    "大型环岛 (出入口数 > 4)": "Roundabout (>4 exits)",
+    "小型环岛": "Mini roundabout",
+    "立体交叉": "Grade-separated", "立交桥": "Overpass",
+    "十字路口": "4-way intersection", "T型路口": "T-junction",
+    "合流区": "Merge zone", "环岛+高速路出入口": "Roundabout + ramp",
+    "有": "Yes", "无": "None",
+    "限速": "Speed limit", "禁止": "Prohibition", "指示": "Direction",
+    "警告": "Warning", "施工": "Construction",
+    "实线": "Solid line", "虚线": "Dashed line", "双黄线": "Double yellow",
+    "导流线": "Channelizing line", "斑马线": "Crosswalk", "标线磨损": "Worn marking",
+    "路灯": "Streetlight", "电线杆": "Power pole", "隔音墙": "Sound barrier",
+    "路边树木": "Roadside trees", "路边停车位": "Roadside parking",
+    "地面停车场出入口": "Parking entrance", "隧道出入口": "Tunnel portal",
+    "居民楼": "Residential", "商场": "Mall", "学校": "School",
+    "医院": "Hospital", "公园": "Park", "绿化带": "Green belt",
+    "收费站": "Toll station", "检查站": "Checkpoint",
+    "施工区域围挡": "Construction barrier", "减速带": "Speed bump",
+    "轿车": "Car", "客车/巴士": "Bus", "卡车/货车": "Truck",
+    "特种车辆 (警)": "Special (police)", "特种车辆(消)": "Special (fire)",
+    "特种车辆(救)": "Special (ambulance)", "工程车辆": "Construction vehicle",
+    "自行车": "Bicycle", "电动车": "E-bike", "三轮车": "Tricycle", "行人": "Pedestrian",
+    "干燥": "Dry", "潮湿": "Wet", "积水": "Puddle",
+    "积雪": "Snow", "结冰": "Ice", "泥泞": "Muddy",
+    "落石": "Rockfall", "遗洒物": "Debris", "倒伏树木": "Fallen tree", "锥桶": "Cone",
+    "晴": "Clear", "多云": "Cloudy", "阴": "Overcast",
+    "雨 (小/中/大)": "Rain (light / mod / heavy)", "雪": "Snow",
+    "雾": "Fog", "冰雹": "Hail",
+    "雾霾": "Haze", "沙尘": "Dust", "烟尘": "Smoke",
+    "正常": "Normal", "强光/逆光": "Harsh / backlit",
+    "弱光/昏暗": "Low light", "黑暗": "Dark",
+
+    # ── Cities ───────────────────────────────────────────────
+    "深圳": "Shenzhen", "长春": "Changchun", "香港": "Hong Kong",
+    "北京": "Beijing", "上海": "Shanghai", "广州": "Guangzhou",
+    "哈尔滨": "Harbin", "杭州": "Hangzhou", "武汉": "Wuhan",
+    "成都": "Chengdu", "十堰": "Shiyan", "安阳": "Anyang",
+    "抚州": "Fuzhou", "贵港": "Guigang",
+
+    # ── Misc ─────────────────────────────────────────────────
+    "天气": "Weather", "气温": "Temperature", "机动车": "Motor vehicle",
+    "障碍物": "Obstacle", "其他": "Other", "特殊设施": "Special facility",
+    "道路边缘": "Road edge", "路侧设施": "Roadside facility",
+    "拥挤路段": "Congested segment", "工业区支路": "Industrial road",
+    "地点列表": "Locations",
+}
+
+def T(s):
+    """Translate a Chinese string to the active language.
+    Unknown keys pass through unchanged (safe degradation)."""
+    if not isinstance(s, str):
+        return s
+    lang = st.session_state.get("lang", "zh") if hasattr(st, "session_state") else "zh"
+    if lang == "en":
+        return I18N_EN.get(s, s)
+    return s
+
+def _t_list(values):
+    """Translate every item in a sequence."""
+    return [T(v) for v in values]
+
+def _t_schema(schema):
+    """Return a deep-translated copy of a schema dict (display only).
+    Storage keys remain in Chinese — this only affects what users see."""
+    lang = st.session_state.get("lang", "zh") if hasattr(st, "session_state") else "zh"
+    if lang == "zh":
+        return schema
+    out = {}
+    for k, v in schema.items():
+        if isinstance(v, dict):
+            out[T(k)] = _t_schema(v)
+        elif isinstance(v, list):
+            out[T(k)] = _t_list(v)
+        else:
+            out[T(k)] = T(v) if isinstance(v, str) else v
+    return out
+
 # ─── 路径常量 ─────────────────────────────────────────────────────────
 _BASE = Path(__file__).parent
 INDEX_FILE   = _BASE / "sessions_index.json"
@@ -35,9 +362,9 @@ BLUE = ["#1a56a8","#059669","#d97706","#7c3aed",
 
 # ─── 城市映射 ─────────────────────────────────────────────────────────
 CITY_MAP = {
-    "ShenZhen":"深圳","Changchun":"长春","Hongkong":"香港",
-    "Beijing":"北京","Shanghai":"上海","Guangzhou":"广州",
-    "Haerbin":"哈尔滨","Hangzhou":"杭州","Wuhan":"武汉","Chengdu":"成都",
+    "ShenZhen":T("深圳"),"Changchun":T("长春"),"Hongkong":T("香港"),
+    "Beijing":T("北京"),"Shanghai":T("上海"),"Guangzhou":T("广州"),
+    "Haerbin":T("哈尔滨"),"Hangzhou":T("杭州"),"Wuhan":T("武汉"),"Chengdu":T("成都"),
 }
 
 # ─── 标签体系 ─────────────────────────────────────────────────────────
@@ -147,11 +474,11 @@ def parse_hour(ct: str) -> int:
 
 def time_period(h: int) -> str:
     """修复原版：h<0 未知；0-6 / 19-23 均归夜间"""
-    if h < 0:        return "未知"
-    if 7 <= h < 9:   return "早高峰 (07-09)"
-    if 17 <= h < 19: return "晚高峰 (17-19)"
-    if h >= 19 or h < 7: return "夜间 (19-07)"
-    return "日常规"
+    if h < 0:        return T("未知")
+    if 7 <= h < 9:   return T("早高峰 (07-09)")
+    if 17 <= h < 19: return T("晚高峰 (17-19)")
+    if h >= 19 or h < 7: return T("夜间 (19-07)")
+    return T("日常规")
 
 def fmt_dur(minutes: float) -> str:
     return f"{minutes/60:.1f}h" if minutes >= 60 else f"{minutes:.0f}min"
@@ -266,7 +593,7 @@ def load_df() -> pd.DataFrame:
     try:
         with db_conn() as conn:
             df_manual = pd.read_sql(SQL, conn)
-            df_manual["source"] = "手动标注"
+            df_manual["source"] = T("手动标注")
             frames.append(df_manual)
     except Exception:
         pass
@@ -274,7 +601,7 @@ def load_df() -> pd.DataFrame:
         conn2 = sqlite3.connect(AUTO_DB_FILE)
         df_auto = pd.read_sql(SQL, conn2)
         conn2.close()
-        df_auto["source"] = "VLM自动"
+        df_auto["source"] = T("VLM自动")
         frames.append(df_auto)
     except Exception:
         pass
@@ -301,11 +628,11 @@ def load_df() -> pd.DataFrame:
         lambda p: _resolve_img(str(p)) if pd.notna(p) and p else p
     )
     def _city(p):
-        if not p or "/" not in p: return "手动录入"
+        if not p or "/" not in p: return T("手动录入")
         prefix = p.split("/")[0]
         if prefix in ("MANUAL", "PHOTO"):
             parts = p.split("/")
-            return parts[1] if len(parts) > 1 else "手动录入"
+            return parts[1] if len(parts) > 1 else T("手动录入")
         return extract_city(prefix)
     df["city"] = df["folder_path"].apply(_city)
     df["year"] = df["folder_path"].apply(lambda p: p[:4] if p and p[:4].isdigit() else "")
@@ -393,23 +720,29 @@ def save_manual_location(folder_path, video_name, location_name, collection_time
 
 # ─── 表单渲染 ─────────────────────────────────────────────────────────
 def _field(sub_key: str, attr: str, options: list, existing_sec: dict, form_key: str):
-    """渲染单个表单字段（单选/多选）"""
+    """渲染单个表单字段（单选/多选）—— 显示时翻译标签与选项，存储仍用中文"""
     is_multi = attr in SECONDARY_MULTI.get(sub_key, [])
     ex_val   = existing_sec.get(sub_key, {}).get(attr)
-    label    = f"{sub_key} · {attr}"
+    label    = f"{T(sub_key)} · {T(attr)}"
+    # format_func maps option → display text so users see EN while storage
+    # still uses the original Chinese tokens
+    fmt = T
     if is_multi:
         if isinstance(ex_val, str): ex_val = [ex_val] if ex_val else []
         elif not isinstance(ex_val, list): ex_val = []
-        return st.multiselect(label, options, default=[v for v in ex_val if v in options], key=form_key)
+        return st.multiselect(label, options, default=[v for v in ex_val if v in options],
+                              key=form_key, format_func=fmt)
     else:
         if isinstance(ex_val, list): ex_val = ex_val[0] if ex_val else ""
-        return st.selectbox(label, options, index=options.index(ex_val) if ex_val in options else 0, key=form_key)
+        return st.selectbox(label, options,
+                            index=options.index(ex_val) if ex_val in options else 0,
+                            key=form_key, format_func=fmt)
 
 def render_schema_section(schema: dict, existing: dict, key_prefix: str) -> dict:
-    """3 列布局渲染整个 schema，返回收集到的标签 dict"""
+    """3 列布局渲染整个 schema，返回收集到的标签 dict（key 仍为中文）"""
     result = {}
     for sec, sub_dict in schema.items():
-        st.markdown(f"<div class='sec-bar'>{sec}</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='sec-bar'>{T(sec)}</div>", unsafe_allow_html=True)
         result[sec] = {}
         cols = st.columns(3)
         ci = 0
@@ -456,7 +789,7 @@ def page_label():
     _fc1, _fc2 = st.columns([2, 2])
     with _fc1:
         all_cities = sorted({v["city"] for v in loc_groups.values()})
-        sel_city   = st.multiselect("🌆 城市过滤", all_cities, default=all_cities, key="lbl_city")
+        sel_city   = st.multiselect(T("🌆 城市过滤"), all_cities, default=all_cities, key="lbl_city")
     filtered     = {_k: _v for _k, _v in sorted(loc_groups.items()) if _v["city"] in sel_city}
     total_reps   = sum(len(_v["all_reps"]) for _v in filtered.values())
     labeled_reps = sum(1 for _v in filtered.values()
@@ -482,13 +815,13 @@ def page_label():
 
     with _col_r:
         if "sel_loc" not in st.session_state:
-            st.info("← 从左侧列表中选择一个地点开始标注")
+            st.info(T("← 从左侧列表中选择一个地点开始标注"))
             return
 
         l2  = st.session_state.sel_loc
         loc = loc_groups.get(l2)
         if not loc:
-            st.warning("地点数据不存在")
+            st.warning(T("地点数据不存在"))
             return
 
         n_rep  = len(loc["all_reps"])
@@ -504,7 +837,7 @@ def page_label():
             f"</div>", unsafe_allow_html=True
         )
 
-        tab_static, tab_dynamic = st.tabs(["📍 静态标签（整个地点）", "🎬 动态标签（逐图）"])
+        tab_static, tab_dynamic = st.tabs([T("📍 静态标签（整个地点）"), T("🎬 动态标签（逐图）")])
 
         # ── Tab1 静态 ──
         with tab_static:
@@ -515,14 +848,14 @@ def page_label():
             with st.form(key=f"static_{l2}"):
                 c1, c2 = st.columns(2)
                 with c1:
-                    top_cat = st.selectbox("道路主类", cats,
+                    top_cat = st.selectbox(T("道路主类"), cats,
                         index=cats.index(ex.get("top_cat","")) if ex.get("top_cat","") in cats else 0,
-                        key=f"scat_{l2}")
+                        key=f"scat_{l2}", format_func=T)
                 with c2:
                     subs    = TOP_LEVEL_CONFIG[top_cat]
-                    top_sub = st.selectbox("道路子类", subs,
+                    top_sub = st.selectbox(T("道路子类"), subs,
                         index=subs.index(ex.get("top_sub","")) if ex.get("top_sub","") in subs else 0,
-                        key=f"ssub_{l2}")
+                        key=f"ssub_{l2}", format_func=T)
                 static_tags = render_schema_section(STATIC_SCHEMA, ex.get("sections",{}), f"st_{l2}")
                 submitted   = st.form_submit_button(
                     f"💾 保存静态标签 → 应用到本地点全部 {n_rep} 张代表图",
@@ -552,7 +885,7 @@ def page_label():
                     for ci, rep in enumerate(dreps):
                         with img_cols[ci]:
                             p = Path(rep.get("image_path",""))
-                            st.image(str(p), use_container_width=True) if p.exists() else st.markdown("🖼 图片不存在")
+                            st.image(str(p), use_container_width=True) if p.exists() else st.markdown(T("🖼 图片不存在"))
                             done_mark = "✅" if rep["folder_path"] in labeled_fps else "⬜"
                             st.markdown(
                                 f"<div style='font-size:12px;color:#1565C0;text-align:center'>"
@@ -574,13 +907,13 @@ def page_label():
                             with st.form(key=f"dyn_{fp.replace('/','_')}"):
                                 dyn_tags = render_schema_section(
                                     DYNAMIC_SCHEMA, existing_dyn, f"d_{fp.replace('/','_')}")
-                                comments = st.text_input("备注", value="",
+                                comments = st.text_input(T("备注"), value="",
                                                          key=f"cmt_{fp.replace('/','_')}")
-                                save_btn = st.form_submit_button("💾 保存", type="primary")
+                                save_btn = st.form_submit_button(T("💾 保存"), type="primary")
                             if save_btn:
                                 save_dynamic_for_rep(rep, l2, loc_static, dyn_tags, comments)
                                 load_labeled_fps.clear(); load_df.clear()
-                                st.success("✅ 已保存"); st.rerun()
+                                st.success(T("✅ 已保存")); st.rerun()
 
 # ─── 地点详情面板 ────────────────────────────────────────────────────
 def _render_loc_detail(df_f: pd.DataFrame, loc_row):
@@ -655,13 +988,13 @@ def _render_loc_detail(df_f: pd.DataFrame, loc_row):
             c_info = st.container()
 
     summary_items = [
-        ("道路主类",  loc_row.get("top_road_category")  or "—"),
-        ("道路子类",  loc_row.get("top_road_subcategory") or "—"),
-        ("交叉类型",  _t("一、道路静态环境", "1.6 道路交叉",     "交叉类型")),
-        ("路面状态",  _t("一、道路静态环境", "1.2 道路表面",     "表面状态")),
-        ("天气",      _t("四、大气环境",      "4.1 天气",        "类型")),
-        ("机动车",    _t("三、动态目标 (路面状况)", "3.1 机动车", "类型")),
-        ("VRU",       _t("三、动态目标 (路面状况)", "3.2 VRU",    "类型")),
+        (T("道路主类"),  loc_row.get("top_road_category")  or "—"),
+        (T("道路子类"),  loc_row.get("top_road_subcategory") or "—"),
+        (T("交叉类型"),  _t(T("一、道路静态环境"), T("1.6 道路交叉"),     T("交叉类型"))),
+        (T("路面状态"),  _t(T("一、道路静态环境"), T("1.2 道路表面"),     T("表面状态"))),
+        (T("天气"),      _t(T("四、大气环境"),      T("4.1 天气"),        T("类型"))),
+        (T("机动车"),    _t(T("三、动态目标 (路面状况)"), T("3.1 机动车"), T("类型"))),
+        ("VRU",       _t(T("三、动态目标 (路面状况)"), "3.2 VRU",    T("类型"))),
     ]
     chips = " &nbsp;".join(
         f"<span style='background:#e8f0fe;color:#1a56a8;border-radius:6px;"
@@ -683,29 +1016,29 @@ def _render_loc_detail(df_f: pd.DataFrame, loc_row):
     # ── 完整 ODD 标签（2列布局） ──
     st.markdown("<div style='margin-top:10px'></div>", unsafe_allow_html=True)
     odd_sections = [
-        ("🛣️ 一、道路静态环境", [
-            ("1.2 道路表面",   tags.get("一、道路静态环境", {}).get("1.2 道路表面",   {})),
-            ("1.3 道路几何",   tags.get("一、道路静态环境", {}).get("1.3 道路几何",   {})),
-            ("1.4 包含车道特征", tags.get("一、道路静态环境", {}).get("1.4 包含车道特征", {})),
-            ("1.5 道路边缘",   tags.get("一、道路静态环境", {}).get("1.5 道路边缘",   {})),
-            ("1.6 道路交叉",   tags.get("一、道路静态环境", {}).get("1.6 道路交叉",   {})),
+        (T("🛣️ 一、道路静态环境"), [
+            (T("1.2 道路表面"),   tags.get(T("一、道路静态环境"), {}).get(T("1.2 道路表面"),   {})),
+            (T("1.3 道路几何"),   tags.get(T("一、道路静态环境"), {}).get(T("1.3 道路几何"),   {})),
+            (T("1.4 包含车道特征"), tags.get(T("一、道路静态环境"), {}).get(T("1.4 包含车道特征"), {})),
+            (T("1.5 道路边缘"),   tags.get(T("一、道路静态环境"), {}).get(T("1.5 道路边缘"),   {})),
+            (T("1.6 道路交叉"),   tags.get(T("一、道路静态环境"), {}).get(T("1.6 道路交叉"),   {})),
         ]),
-        ("🚦 二、交通设施", [
-            ("2.1 交通控制",       tags.get("二、交通设施", {}).get("2.1 交通控制",       {})),
-            ("2.2 路侧与周边环境", tags.get("二、交通设施", {}).get("2.2 路侧与周边环境", {})),
-            ("2.3 特殊设施",       tags.get("二、交通设施", {}).get("2.3 特殊设施",       {})),
+        (T("🚦 二、交通设施"), [
+            (T("2.1 交通控制"),       tags.get(T("二、交通设施"), {}).get(T("2.1 交通控制"),       {})),
+            (T("2.2 路侧与周边环境"), tags.get(T("二、交通设施"), {}).get(T("2.2 路侧与周边环境"), {})),
+            (T("2.3 特殊设施"),       tags.get(T("二、交通设施"), {}).get(T("2.3 特殊设施"),       {})),
         ]),
-        ("🚗 三、动态目标", [
-            ("3.1 机动车",   tags.get("三、动态目标 (路面状况)", {}).get("3.1 机动车",   {})),
-            ("3.2 VRU",      tags.get("三、动态目标 (路面状况)", {}).get("3.2 VRU",      {})),
-            ("3.3 动物",     tags.get("三、动态目标 (路面状况)", {}).get("3.3 动物",     {})),
-            ("3.4 障碍物",   tags.get("三、动态目标 (路面状况)", {}).get("3.4 障碍物",   {})),
-            ("3.5 事故车辆", tags.get("三、动态目标 (路面状况)", {}).get("3.5 事故车辆", {})),
+        (T("🚗 三、动态目标"), [
+            (T("3.1 机动车"),   tags.get(T("三、动态目标 (路面状况)"), {}).get(T("3.1 机动车"),   {})),
+            ("3.2 VRU",      tags.get(T("三、动态目标 (路面状况)"), {}).get("3.2 VRU",      {})),
+            (T("3.3 动物"),     tags.get(T("三、动态目标 (路面状况)"), {}).get(T("3.3 动物"),     {})),
+            (T("3.4 障碍物"),   tags.get(T("三、动态目标 (路面状况)"), {}).get(T("3.4 障碍物"),   {})),
+            (T("3.5 事故车辆"), tags.get(T("三、动态目标 (路面状况)"), {}).get(T("3.5 事故车辆"), {})),
         ]),
-        ("🌤️ 四、大气环境", [
-            ("4.1 天气",   tags.get("四、大气环境", {}).get("4.1 天气",   {})),
-            ("4.2 颗粒物", tags.get("四、大气环境", {}).get("4.2 颗粒物", {})),
-            ("4.3 光照",   tags.get("四、大气环境", {}).get("4.3 光照",   {})),
+        (T("🌤️ 四、大气环境"), [
+            (T("4.1 天气"),   tags.get(T("四、大气环境"), {}).get(T("4.1 天气"),   {})),
+            (T("4.2 颗粒物"), tags.get(T("四、大气环境"), {}).get(T("4.2 颗粒物"), {})),
+            (T("4.3 光照"),   tags.get(T("四、大气环境"), {}).get(T("4.3 光照"),   {})),
         ]),
     ]
     oc1, oc2 = st.columns(2)
@@ -730,7 +1063,7 @@ def _render_loc_detail(df_f: pd.DataFrame, loc_row):
     # ── 采集时段分布图 ──────────────────────────────────────────────────
     if "_period" in loc_rows_all.columns:
         import plotly.express as px
-        _PO = ["早高峰 (07-09)", "日常规", "晚高峰 (17-19)", "夜间 (19-07)", "未知"]
+        _PO = [T("早高峰 (07-09)"), T("日常规"), T("晚高峰 (17-19)"), T("夜间 (19-07)"), T("未知")]
         pd_data = (loc_rows_all.groupby("_period")["duration"]
                    .sum().reset_index(name="时长_min"))
         pd_data["时长(h)"] = (pd_data["时长_min"] / 60).round(2)
@@ -744,7 +1077,7 @@ def _render_loc_detail(df_f: pd.DataFrame, loc_row):
             )
             fig = px.bar(
                 pd_data, x="_period", y="时长(h)", text="时长(h)", color="_period",
-                color_discrete_sequence=BLUE, labels={"_period": "时段", "时长(h)": "时长 (h)"},
+                color_discrete_sequence=BLUE, labels={"_period": T("时段"), "时长(h)": T("时长 (h)")},
             )
             fig.update_traces(
                 textposition="outside",
@@ -789,7 +1122,7 @@ def _render_location_wall(df_f: pd.DataFrame):
             fp      = row["folder_path"]
             is_open = st.session_state["loc_open"] == fp
             tags    = row.get("_tags") or {}
-            cross   = extract_tag(tags, "一、道路静态环境", "1.6 道路交叉", "交叉类型")
+            cross   = extract_tag(tags, T("一、道路静态环境"), T("1.6 道路交叉"), T("交叉类型"))
             cross_s = "、".join(cross) if cross else ""
             sub_s   = row.get("top_road_subcategory") or ""
             cat_s   = row.get("top_road_category")    or ""
@@ -816,7 +1149,7 @@ def _render_location_wall(df_f: pd.DataFrame):
                     + (f"<div style='font-size:0.70rem;color:#9ca3af'>{cross_s}</div>" if cross_s else "")
                     + "</div>", unsafe_allow_html=True
                 )
-                if st.button("▾ 收起" if is_open else "▸ 查看标签",
+                if st.button(T("▾ 收起") if is_open else T("▸ 查看标签"),
                              key=f"loc_btn_{fp}", use_container_width=True):
                     st.session_state["loc_open"] = None if is_open else fp
                     st.rerun()
@@ -833,18 +1166,19 @@ def page_dashboard():
 
     df = load_df()
     if df.empty:
-        st.info("数据库暂无数据，请先完成标注"); return
+        st.info(T("数据库暂无数据，请先完成标注")); return
 
-    with st.expander("🔍 筛选条件", expanded=True):
+    with st.expander(T("🔍 筛选条件"), expanded=True):
         _dc1, _dc2, _dc3 = st.columns([1, 2, 2])
         with _dc1:
-            if st.button("🔄 刷新数据", key="dash_refresh"):
+            if st.button(T("🔄 刷新数据"), key="dash_refresh"):
                 load_df.clear(); st.rerun()
         with _dc2:
-            sel_c = st.multiselect("城市", sorted(df["city"].dropna().unique()),
-                                   default=sorted(df["city"].dropna().unique()), key="dc")
+            sel_c = st.multiselect(T("城市"), sorted(df["city"].dropna().unique()),
+                                   default=sorted(df["city"].dropna().unique()),
+                                   key="dc", format_func=T)
         with _dc3:
-            sel_r = st.multiselect("道路主类", sorted(df["top_road_category"].dropna().unique()),
+            sel_r = st.multiselect(T("道路主类"), sorted(df["top_road_category"].dropna().unique()),
                                    default=sorted(df["top_road_category"].dropna().unique()), key="dr")
 
     # ── 高级筛选 ──
@@ -856,85 +1190,85 @@ def page_dashboard():
                 vals.update(v)
         return sorted(vals)
 
-    PERIOD_ORDER = ["早高峰 (07-09)", "日常规", "晚高峰 (17-19)", "夜间 (19-07)", "未知"]
+    PERIOD_ORDER = [T("早高峰 (07-09)"), T("日常规"), T("晚高峰 (17-19)"), T("夜间 (19-07)"), T("未知")]
 
-    with st.expander("⚙️ 高级筛选", expanded=False):
+    with st.expander(T("⚙️ 高级筛选"), expanded=False):
         # ── 一、道路静态环境 ──────────────────────────────────────
-        st.markdown("**一、道路静态环境**")
+        st.markdown(T("**一、道路静态环境**"))
         _r1c1, _r1c2, _r1c3, _r1c4 = st.columns(4)
         _r2c1, _r2c2, _r2c3, _r2c4 = st.columns(4)
 
         sub_opts    = sorted(df["top_road_subcategory"].dropna().unique())
-        cross_opts  = _tag_vals(df, "一、道路静态环境", "1.6 道路交叉",       "交叉类型")
-        lane_n_opts = _tag_vals(df, "一、道路静态环境", "1.4 包含车道特征",   "最宽车道数量")
-        lane_t_opts = _tag_vals(df, "一、道路静态环境", "1.4 包含车道特征",   "车道类型")
-        lane_w_opts = _tag_vals(df, "一、道路静态环境", "1.4 包含车道特征",   "车道宽度")
-        surf_opts   = _tag_vals(df, "一、道路静态环境", "1.2 道路表面",       "表面类型")
-        surf_s_opts = _tag_vals(df, "一、道路静态环境", "1.2 道路表面",       "表面状态")
-        slope_opts  = _tag_vals(df, "一、道路静态环境", "1.3 道路几何",       "坡度")
-        curv_opts   = _tag_vals(df, "一、道路静态环境", "1.3 道路几何",       "曲率")
-        bank_opts   = _tag_vals(df, "一、道路静态环境", "1.3 道路几何",       "横坡")
-        edge_opts   = _tag_vals(df, "一、道路静态环境", "1.5 道路边缘",       "边缘类型")
+        cross_opts  = _tag_vals(df, T("一、道路静态环境"), T("1.6 道路交叉"),       T("交叉类型"))
+        lane_n_opts = _tag_vals(df, T("一、道路静态环境"), T("1.4 包含车道特征"),   T("最宽车道数量"))
+        lane_t_opts = _tag_vals(df, T("一、道路静态环境"), T("1.4 包含车道特征"),   T("车道类型"))
+        lane_w_opts = _tag_vals(df, T("一、道路静态环境"), T("1.4 包含车道特征"),   T("车道宽度"))
+        surf_opts   = _tag_vals(df, T("一、道路静态环境"), T("1.2 道路表面"),       T("表面类型"))
+        surf_s_opts = _tag_vals(df, T("一、道路静态环境"), T("1.2 道路表面"),       T("表面状态"))
+        slope_opts  = _tag_vals(df, T("一、道路静态环境"), T("1.3 道路几何"),       T("坡度"))
+        curv_opts   = _tag_vals(df, T("一、道路静态环境"), T("1.3 道路几何"),       T("曲率"))
+        bank_opts   = _tag_vals(df, T("一、道路静态环境"), T("1.3 道路几何"),       T("横坡"))
+        edge_opts   = _tag_vals(df, T("一、道路静态环境"), T("1.5 道路边缘"),       T("边缘类型"))
 
-        with _r1c1: sel_sub      = st.multiselect("道路子类",   sub_opts,    default=sub_opts,    key="adv_sub")
-        with _r1c2: sel_cross    = st.multiselect("交叉类型",   cross_opts,  default=cross_opts,  key="adv_cross")
-        with _r1c3: sel_lane_n   = st.multiselect("车道数量",   lane_n_opts, default=lane_n_opts, key="adv_lane_n")
-        with _r1c4: sel_lane_t   = st.multiselect("车道类型",   lane_t_opts, default=lane_t_opts, key="adv_lane_t")
-        with _r2c1: sel_lane_w   = st.multiselect("车道宽度",   lane_w_opts, default=lane_w_opts, key="adv_lane_w")
-        with _r2c2: sel_surf     = st.multiselect("路面类型",   surf_opts,   default=surf_opts,   key="adv_surf")
-        with _r2c3: sel_surf_s   = st.multiselect("路面状态",   surf_s_opts, default=surf_s_opts, key="adv_surf_s")
-        with _r2c4: sel_edge     = st.multiselect("道路边缘",   edge_opts,   default=edge_opts,   key="adv_edge")
+        with _r1c1: sel_sub      = st.multiselect(T("道路子类"),   sub_opts,    default=sub_opts,    key="adv_sub")
+        with _r1c2: sel_cross    = st.multiselect(T("交叉类型"),   cross_opts,  default=cross_opts,  key="adv_cross")
+        with _r1c3: sel_lane_n   = st.multiselect(T("车道数量"),   lane_n_opts, default=lane_n_opts, key="adv_lane_n")
+        with _r1c4: sel_lane_t   = st.multiselect(T("车道类型"),   lane_t_opts, default=lane_t_opts, key="adv_lane_t")
+        with _r2c1: sel_lane_w   = st.multiselect(T("车道宽度"),   lane_w_opts, default=lane_w_opts, key="adv_lane_w")
+        with _r2c2: sel_surf     = st.multiselect(T("路面类型"),   surf_opts,   default=surf_opts,   key="adv_surf")
+        with _r2c3: sel_surf_s   = st.multiselect(T("路面状态"),   surf_s_opts, default=surf_s_opts, key="adv_surf_s")
+        with _r2c4: sel_edge     = st.multiselect(T("道路边缘"),   edge_opts,   default=edge_opts,   key="adv_edge")
 
         _r3c1, _r3c2, _r3c3 = st.columns(3)
-        with _r3c1: sel_slope    = st.multiselect("坡度",       slope_opts,  default=slope_opts,  key="adv_slope")
-        with _r3c2: sel_curv     = st.multiselect("曲率",       curv_opts,   default=curv_opts,   key="adv_curv")
-        with _r3c3: sel_bank     = st.multiselect("横坡",       bank_opts,   default=bank_opts,   key="adv_bank")
+        with _r3c1: sel_slope    = st.multiselect(T("坡度"),       slope_opts,  default=slope_opts,  key="adv_slope")
+        with _r3c2: sel_curv     = st.multiselect(T("曲率"),       curv_opts,   default=curv_opts,   key="adv_curv")
+        with _r3c3: sel_bank     = st.multiselect(T("横坡"),       bank_opts,   default=bank_opts,   key="adv_bank")
 
         st.divider()
         # ── 二、交通设施 ──────────────────────────────────────────
-        st.markdown("**二、交通设施**")
+        st.markdown(T("**二、交通设施**"))
         _r4c1, _r4c2, _r4c3, _r4c4 = st.columns(4)
 
-        sig_opts    = _tag_vals(df, "二、交通设施", "2.1 交通控制",       "信号灯")
-        sign_opts   = _tag_vals(df, "二、交通设施", "2.1 交通控制",       "标志牌")
-        mark_opts   = _tag_vals(df, "二、交通设施", "2.1 交通控制",       "地面标签")
-        fac_opts    = _tag_vals(df, "二、交通设施", "2.2 路侧与周边环境", "设施")
-        spec_opts   = _tag_vals(df, "二、交通设施", "2.3 特殊设施",       "类型")
+        sig_opts    = _tag_vals(df, T("二、交通设施"), T("2.1 交通控制"),       T("信号灯"))
+        sign_opts   = _tag_vals(df, T("二、交通设施"), T("2.1 交通控制"),       T("标志牌"))
+        mark_opts   = _tag_vals(df, T("二、交通设施"), T("2.1 交通控制"),       T("地面标签"))
+        fac_opts    = _tag_vals(df, T("二、交通设施"), T("2.2 路侧与周边环境"), T("设施"))
+        spec_opts   = _tag_vals(df, T("二、交通设施"), T("2.3 特殊设施"),       T("类型"))
 
-        with _r4c1: sel_sig      = st.multiselect("信号灯",     sig_opts,   default=sig_opts,   key="adv_sig")
-        with _r4c2: sel_sign     = st.multiselect("标志牌",     sign_opts,  default=sign_opts,  key="adv_sign")
-        with _r4c3: sel_mark     = st.multiselect("地面标线",   mark_opts,  default=mark_opts,  key="adv_mark")
-        with _r4c4: sel_spec     = st.multiselect("特殊设施",   spec_opts,  default=spec_opts,  key="adv_spec")
-        sel_fac = st.multiselect("路侧设施", fac_opts, default=fac_opts, key="adv_fac")
+        with _r4c1: sel_sig      = st.multiselect(T("信号灯"),     sig_opts,   default=sig_opts,   key="adv_sig")
+        with _r4c2: sel_sign     = st.multiselect(T("标志牌"),     sign_opts,  default=sign_opts,  key="adv_sign")
+        with _r4c3: sel_mark     = st.multiselect(T("地面标线"),   mark_opts,  default=mark_opts,  key="adv_mark")
+        with _r4c4: sel_spec     = st.multiselect(T("特殊设施"),   spec_opts,  default=spec_opts,  key="adv_spec")
+        sel_fac = st.multiselect(T("路侧设施"), fac_opts, default=fac_opts, key="adv_fac")
 
         st.divider()
         # ── 三、动态目标 ──────────────────────────────────────────
-        st.markdown("**三、动态目标**")
+        st.markdown(T("**三、动态目标**"))
         _r5c1, _r5c2, _r5c3 = st.columns(3)
 
-        mv_opts     = _tag_vals(df, "三、动态目标 (路面状况)", "3.1 机动车",   "类型")
-        vru_opts    = _tag_vals(df, "三、动态目标 (路面状况)", "3.2 VRU",      "类型")
-        obs_opts    = _tag_vals(df, "三、动态目标 (路面状况)", "3.4 障碍物",   "类型")
+        mv_opts     = _tag_vals(df, T("三、动态目标 (路面状况)"), T("3.1 机动车"),   T("类型"))
+        vru_opts    = _tag_vals(df, T("三、动态目标 (路面状况)"), "3.2 VRU",      T("类型"))
+        obs_opts    = _tag_vals(df, T("三、动态目标 (路面状况)"), T("3.4 障碍物"),   T("类型"))
 
-        with _r5c1: sel_mv       = st.multiselect("机动车类型", mv_opts,    default=mv_opts,    key="adv_mv")
-        with _r5c2: sel_vru      = st.multiselect("VRU 类型",   vru_opts,   default=vru_opts,   key="adv_vru")
-        with _r5c3: sel_obs      = st.multiselect("障碍物",     obs_opts,   default=obs_opts,   key="adv_obs")
+        with _r5c1: sel_mv       = st.multiselect(T("机动车类型"), mv_opts,    default=mv_opts,    key="adv_mv")
+        with _r5c2: sel_vru      = st.multiselect(T("VRU 类型"),   vru_opts,   default=vru_opts,   key="adv_vru")
+        with _r5c3: sel_obs      = st.multiselect(T("障碍物"),     obs_opts,   default=obs_opts,   key="adv_obs")
 
         st.divider()
         # ── 四、大气环境 + 时段 ───────────────────────────────────
-        st.markdown("**四、大气环境 & 采集时段**")
+        st.markdown(T("**四、大气环境 & 采集时段**"))
         _r6c1, _r6c2, _r6c3, _r6c4, _r6c5 = st.columns(5)
 
-        wth_opts    = _tag_vals(df, "四、大气环境", "4.1 天气",  "类型")
-        light_opts  = _tag_vals(df, "四、大气环境", "4.3 光照",  "来源")
-        lumi_opts   = _tag_vals(df, "四、大气环境", "4.3 光照",  "强度")
-        temp_opts   = _tag_vals(df, "四、大气环境", "4.4 气温",  "估算")
+        wth_opts    = _tag_vals(df, T("四、大气环境"), T("4.1 天气"),  T("类型"))
+        light_opts  = _tag_vals(df, T("四、大气环境"), T("4.3 光照"),  T("来源"))
+        lumi_opts   = _tag_vals(df, T("四、大气环境"), T("4.3 光照"),  T("强度"))
+        temp_opts   = _tag_vals(df, T("四、大气环境"), T("4.4 气温"),  T("估算"))
 
-        with _r6c1: sel_wth      = st.multiselect("天气",       wth_opts,   default=wth_opts,   key="adv_wth")
-        with _r6c2: sel_light    = st.multiselect("光照来源",   light_opts, default=light_opts, key="adv_light")
-        with _r6c3: sel_lumi     = st.multiselect("光照强度",   lumi_opts,  default=lumi_opts,  key="adv_lumi")
-        with _r6c4: sel_temp     = st.multiselect("气温",       temp_opts,  default=temp_opts,  key="adv_temp")
-        with _r6c5: sel_period   = st.multiselect("采集时段",   PERIOD_ORDER, default=PERIOD_ORDER, key="adv_period")
+        with _r6c1: sel_wth      = st.multiselect(T("天气"),       wth_opts,   default=wth_opts,   key="adv_wth")
+        with _r6c2: sel_light    = st.multiselect(T("光照来源"),   light_opts, default=light_opts, key="adv_light")
+        with _r6c3: sel_lumi     = st.multiselect(T("光照强度"),   lumi_opts,  default=lumi_opts,  key="adv_lumi")
+        with _r6c4: sel_temp     = st.multiselect(T("气温"),       temp_opts,  default=temp_opts,  key="adv_temp")
+        with _r6c5: sel_period   = st.multiselect(T("采集时段"),   PERIOD_ORDER, default=PERIOD_ORDER, key="adv_period")
 
     def _tag_match(tags, sec, sub, attr, allowed):
         v = extract_tag(tags, sec, sub, attr)
@@ -949,28 +1283,28 @@ def page_dashboard():
         df["top_road_category"].isin(sel_r) &
         (df["top_road_subcategory"].isna() | df["top_road_subcategory"].isin(sel_sub)) &
         df["_period"].isin(sel_period) &
-        df["_tags"].apply(lambda d: _tag_match(d, "一、道路静态环境", "1.6 道路交叉",       "交叉类型",   sel_cross))  &
-        df["_tags"].apply(lambda d: _tag_match(d, "一、道路静态环境", "1.4 包含车道特征",   "最宽车道数量", sel_lane_n)) &
-        df["_tags"].apply(lambda d: _tag_match(d, "一、道路静态环境", "1.4 包含车道特征",   "车道类型",   sel_lane_t)) &
-        df["_tags"].apply(lambda d: _tag_match(d, "一、道路静态环境", "1.4 包含车道特征",   "车道宽度",   sel_lane_w)) &
-        df["_tags"].apply(lambda d: _tag_match(d, "一、道路静态环境", "1.2 道路表面",       "表面类型",   sel_surf))   &
-        df["_tags"].apply(lambda d: _tag_match(d, "一、道路静态环境", "1.2 道路表面",       "表面状态",   sel_surf_s)) &
-        df["_tags"].apply(lambda d: _tag_match(d, "一、道路静态环境", "1.3 道路几何",       "坡度",       sel_slope))  &
-        df["_tags"].apply(lambda d: _tag_match(d, "一、道路静态环境", "1.3 道路几何",       "曲率",       sel_curv))   &
-        df["_tags"].apply(lambda d: _tag_match(d, "一、道路静态环境", "1.3 道路几何",       "横坡",       sel_bank))   &
-        df["_tags"].apply(lambda d: _tag_match(d, "一、道路静态环境", "1.5 道路边缘",       "边缘类型",   sel_edge))   &
-        df["_tags"].apply(lambda d: _tag_match(d, "二、交通设施",     "2.1 交通控制",       "信号灯",     sel_sig))    &
-        df["_tags"].apply(lambda d: _tag_match(d, "二、交通设施",     "2.1 交通控制",       "标志牌",     sel_sign))   &
-        df["_tags"].apply(lambda d: _tag_match(d, "二、交通设施",     "2.1 交通控制",       "地面标签",   sel_mark))   &
-        df["_tags"].apply(lambda d: _tag_match(d, "二、交通设施",     "2.2 路侧与周边环境", "设施",       sel_fac))    &
-        df["_tags"].apply(lambda d: _tag_match(d, "二、交通设施",     "2.3 特殊设施",       "类型",       sel_spec))   &
-        df["_tags"].apply(lambda d: _tag_match(d, "三、动态目标 (路面状况)", "3.1 机动车",   "类型",       sel_mv))     &
-        df["_tags"].apply(lambda d: _tag_match(d, "三、动态目标 (路面状况)", "3.2 VRU",      "类型",       sel_vru))    &
-        df["_tags"].apply(lambda d: _tag_match(d, "三、动态目标 (路面状况)", "3.4 障碍物",   "类型",       sel_obs))    &
-        df["_tags"].apply(lambda d: _tag_match(d, "四、大气环境",     "4.1 天气",           "类型",       sel_wth))    &
-        df["_tags"].apply(lambda d: _tag_match(d, "四、大气环境",     "4.3 光照",           "来源",       sel_light))  &
-        df["_tags"].apply(lambda d: _tag_match(d, "四、大气环境",     "4.3 光照",           "强度",       sel_lumi))   &
-        df["_tags"].apply(lambda d: _tag_match(d, "四、大气环境",     "4.4 气温",           "估算",       sel_temp))
+        df["_tags"].apply(lambda d: _tag_match(d, T("一、道路静态环境"), T("1.6 道路交叉"),       T("交叉类型"),   sel_cross))  &
+        df["_tags"].apply(lambda d: _tag_match(d, T("一、道路静态环境"), T("1.4 包含车道特征"),   T("最宽车道数量"), sel_lane_n)) &
+        df["_tags"].apply(lambda d: _tag_match(d, T("一、道路静态环境"), T("1.4 包含车道特征"),   T("车道类型"),   sel_lane_t)) &
+        df["_tags"].apply(lambda d: _tag_match(d, T("一、道路静态环境"), T("1.4 包含车道特征"),   T("车道宽度"),   sel_lane_w)) &
+        df["_tags"].apply(lambda d: _tag_match(d, T("一、道路静态环境"), T("1.2 道路表面"),       T("表面类型"),   sel_surf))   &
+        df["_tags"].apply(lambda d: _tag_match(d, T("一、道路静态环境"), T("1.2 道路表面"),       T("表面状态"),   sel_surf_s)) &
+        df["_tags"].apply(lambda d: _tag_match(d, T("一、道路静态环境"), T("1.3 道路几何"),       T("坡度"),       sel_slope))  &
+        df["_tags"].apply(lambda d: _tag_match(d, T("一、道路静态环境"), T("1.3 道路几何"),       T("曲率"),       sel_curv))   &
+        df["_tags"].apply(lambda d: _tag_match(d, T("一、道路静态环境"), T("1.3 道路几何"),       T("横坡"),       sel_bank))   &
+        df["_tags"].apply(lambda d: _tag_match(d, T("一、道路静态环境"), T("1.5 道路边缘"),       T("边缘类型"),   sel_edge))   &
+        df["_tags"].apply(lambda d: _tag_match(d, T("二、交通设施"),     T("2.1 交通控制"),       T("信号灯"),     sel_sig))    &
+        df["_tags"].apply(lambda d: _tag_match(d, T("二、交通设施"),     T("2.1 交通控制"),       T("标志牌"),     sel_sign))   &
+        df["_tags"].apply(lambda d: _tag_match(d, T("二、交通设施"),     T("2.1 交通控制"),       T("地面标签"),   sel_mark))   &
+        df["_tags"].apply(lambda d: _tag_match(d, T("二、交通设施"),     T("2.2 路侧与周边环境"), T("设施"),       sel_fac))    &
+        df["_tags"].apply(lambda d: _tag_match(d, T("二、交通设施"),     T("2.3 特殊设施"),       T("类型"),       sel_spec))   &
+        df["_tags"].apply(lambda d: _tag_match(d, T("三、动态目标 (路面状况)"), T("3.1 机动车"),   T("类型"),       sel_mv))     &
+        df["_tags"].apply(lambda d: _tag_match(d, T("三、动态目标 (路面状况)"), "3.2 VRU",      T("类型"),       sel_vru))    &
+        df["_tags"].apply(lambda d: _tag_match(d, T("三、动态目标 (路面状况)"), T("3.4 障碍物"),   T("类型"),       sel_obs))    &
+        df["_tags"].apply(lambda d: _tag_match(d, T("四、大气环境"),     T("4.1 天气"),           T("类型"),       sel_wth))    &
+        df["_tags"].apply(lambda d: _tag_match(d, T("四、大气环境"),     T("4.3 光照"),           T("来源"),       sel_light))  &
+        df["_tags"].apply(lambda d: _tag_match(d, T("四、大气环境"),     T("4.3 光照"),           T("强度"),       sel_lumi))   &
+        df["_tags"].apply(lambda d: _tag_match(d, T("四、大气环境"),     T("4.4 气温"),           T("估算"),       sel_temp))
     ].copy()
     df_f["duration"] = df_f["duration"].fillna(0)
 
@@ -984,10 +1318,10 @@ def page_dashboard():
         st.session_state["kpi_open"] = None
 
     kpi_defs = [
-        ("kpi-blue",   "📹", f"{n_labeled:,}", "视频总数",      "videos"),
-        ("kpi-indigo", "🌆", str(n_cities),    "覆盖城市",      "cities"),
-        ("kpi-teal",   "⏱️",  f"{hrs:.1f}",    "总时长（小时）", None),
-        ("kpi-purple", "📍", str(n_locs),      "地点数",        "locations"),
+        ("kpi-blue",   "📹", f"{n_labeled:,}", T("视频总数"),      "videos"),
+        ("kpi-indigo", "🌆", str(n_cities),    T("覆盖城市"),      "cities"),
+        ("kpi-teal",   "⏱️",  f"{hrs:.1f}",    T("总时长（小时）"), None),
+        ("kpi-purple", "📍", str(n_locs),      T("地点数"),        "locations"),
     ]
     kpi_cols = st.columns(4)
     for col, (cls, icon, num, lbl, key) in zip(kpi_cols, kpi_defs):
@@ -1001,13 +1335,13 @@ def page_dashboard():
             )
             if key:
                 is_open = st.session_state["kpi_open"] == key
-                if st.button("▾ 收起" if is_open else "▸ 展开详情",
+                if st.button(T("▾ 收起") if is_open else T("▸ 展开详情"),
                              key=f"kpi_btn_{key}", use_container_width=True):
                     st.session_state["kpi_open"] = None if is_open else key
                     st.rerun()
             else:
                 st.markdown(
-                    "<p style='text-align:center;font-size:0.76rem;color:#888;margin:6px 0'>含图片数据集</p>",
+                    f"<p style='text-align:center;font-size:0.76rem;color:#888;margin:6px 0'>{T('含图片数据集')}</p>",
                     unsafe_allow_html=True
                 )
 
@@ -1015,20 +1349,20 @@ def page_dashboard():
     _open = st.session_state["kpi_open"]
 
     if _open == "videos":
-        st.markdown("#### 📹 视频 / 场景列表")
+        st.markdown(T("#### 📹 视频 / 场景列表"))
         _cols = ["city", "location_name", "top_road_category", "top_road_subcategory",
                  "duration", "collection_time", "source"]
         disp = df_f[[c for c in _cols if c in df_f.columns]].copy()
         disp["duration"] = disp["duration"].apply(fmt_dur)
         disp = disp.rename(columns={
-            "city": "城市", "location_name": "地点",
-            "top_road_category": "道路主类", "top_road_subcategory": "道路子类",
-            "duration": "时长", "collection_time": "采集时间", "source": "来源"
+            "city": T("城市"), "location_name": T("地点"),
+            "top_road_category": T("道路主类"), "top_road_subcategory": T("道路子类"),
+            "duration": T("时长"), "collection_time": T("采集时间"), "source": T("来源")
         })
         st.dataframe(disp, use_container_width=True, height=400)
 
     elif _open == "cities":
-        st.markdown("#### 🌆 各城市概览")
+        st.markdown(T("#### 🌆 各城市概览"))
         city_sum = (df_f.groupby("city")
                     .agg(场景数=("id", "count"), 总时长=("duration", "sum"))
                     .reset_index()
@@ -1050,19 +1384,19 @@ def page_dashboard():
                     )
 
     elif _open == "locations":
-        st.markdown("#### 📍 地点卡片墙")
+        st.markdown(T("#### 📍 地点卡片墙"))
         _render_location_wall(df_f)
 
     st.divider()
 
     # ── 地域与时间分布 ──
-    st.markdown("### 📍 地域与时间分布")
+    st.markdown(T("### 📍 地域与时间分布"))
     c1, c2 = st.columns(2)
     with c1:
         cd = df_f.groupby("city").agg(数量=("id","count")).reset_index()
         if not cd.empty:
             fig = px.bar(cd, x="city", y="数量", text="数量", color="city",
-                         color_discrete_sequence=BLUE, title="各城市标注数量", labels={"city":"城市"})
+                         color_discrete_sequence=BLUE, title=T("各城市标注数量"), labels={"city":T("城市")})
             fig.update_traces(textposition="outside", textfont=dict(size=11, color="#0d2d5e"),
                               marker_line_width=0, opacity=0.88)
             fig.update_layout(**_cl(), showlegend=False)
@@ -1073,48 +1407,48 @@ def page_dashboard():
               .sort_values("时长(h)", ascending=False).head(15))
         if not ld.empty:
             fig = px.bar(ld, x="location_name", y="时长(h)", color="location_name",
-                         color_discrete_sequence=BLUE, title="各地点视频总时长 (Top 15)",
-                         labels={"location_name":"地点","时长(h)":"时长(h)"})
+                         color_discrete_sequence=BLUE, title=T("各地点视频总时长 (Top 15)"),
+                         labels={"location_name":T("地点"),"时长(h)":T("时长(h)")})
             fig.update_traces(marker_line_width=0, opacity=0.88)
             fig.update_layout(**_cl(), showlegend=False, xaxis_tickangle=-45)
             st.plotly_chart(fig, use_container_width=True)
 
     # ── 采集时段 ──
-    st.markdown("### 🕐 采集时段分布")
+    st.markdown(T("### 🕐 采集时段分布"))
     df_f["period"] = df_f["_period"]
     pd_df = df_f.groupby("period").size().reset_index(name="数量")
     pd_df["_o"] = pd_df["period"].apply(lambda x: PERIOD_ORDER.index(x) if x in PERIOD_ORDER else 99)
     pd_df = pd_df.sort_values("_o").drop(columns=["_o"])
     if not pd_df.empty:
         fig = px.bar(pd_df, x="period", y="数量", text="数量", color="period",
-                     color_discrete_sequence=BLUE, title="采集时段分布", labels={"period":"时段"})
+                     color_discrete_sequence=BLUE, title=T("采集时段分布"), labels={"period":T("时段")})
         fig.update_traces(textposition="outside", textfont=dict(size=11, color="#0d2d5e"),
                           marker_line_width=0, opacity=0.88)
         fig.update_layout(**_cl(), showlegend=False)
         st.plotly_chart(fig, use_container_width=True)
 
     # ── 道路类型旭日图 ──
-    st.markdown("### 🛣️ 道路类型分布")
+    st.markdown(T("### 🛣️ 道路类型分布"))
     top_df = df_f[df_f["top_road_category"].notna() & (df_f["top_road_category"] != "")]
     if not top_df.empty:
         rows = []
         for _, row in top_df.iterrows():
-            vals = extract_tag(row["_tags"],"一、道路静态环境","1.6 道路交叉","交叉类型")
-            for ct in (vals or ["未标注"]):
+            vals = extract_tag(row["_tags"],T("一、道路静态环境"),T("1.6 道路交叉"),T("交叉类型"))
+            for ct in (vals or [T("未标注")]):
                 rows.append({"主类":row["top_road_category"],
                              "子类":row.get("top_road_subcategory",""),"交叉类型":ct})
         if rows:
             sb = pd.DataFrame(rows).groupby(["主类","子类","交叉类型"]).size().reset_index(name="数量")
             fig = px.sunburst(sb, path=["主类","子类","交叉类型"], values="数量",
-                              title="道路类型层级分布", color_discrete_sequence=BLUE)
+                              title=T("道路类型层级分布"), color_discrete_sequence=BLUE)
             fig.update_traces(textfont=dict(size=11))
             fig.update_layout(**_cl(), margin=dict(t=52,l=0,r=0,b=0))
             st.plotly_chart(fig, use_container_width=True)
 
     # ── 标签分布 ──
-    st.markdown("### 🏷️ 标签分布")
+    st.markdown(T("### 🏷️ 标签分布"))
     tag_opts = [f"{sub} · {attr}" for _, sub, attr in TAG_PATHS]
-    sel_tag  = st.selectbox("标签维度", tag_opts, key="dash_tag")
+    sel_tag  = st.selectbox(T("标签维度"), tag_opts, key="dash_tag")
     sec, sub, attr = TAG_PATHS[tag_opts.index(sel_tag)]
     items = []
     for d in df_f["_tags"]:
@@ -1122,8 +1456,8 @@ def page_dashboard():
         if v: items.extend(v)
     if items:
         cnt = pd.Series(items).value_counts().reset_index()
-        cnt.columns = ["标签值","数量"]
-        ct = st.radio("图表类型", ["柱状图","饼图"], horizontal=True, key="dchart")
+        cnt.columns = [T("标签值"),T("数量")]
+        ct = st.radio(T("图表类型"), [T("柱状图"),T("饼图")], horizontal=True, key="dchart")
         if ct == "饼图":
             fig = px.pie(cnt, values="数量", names="标签值",
                          title=f"{sub} · {attr}", color_discrete_sequence=BLUE, hole=0.38)
@@ -1138,22 +1472,22 @@ def page_dashboard():
         fig.update_layout(**_cl())
         st.plotly_chart(fig, use_container_width=True)
     else:
-        st.info("该维度暂无数据")
+        st.info(T("该维度暂无数据"))
 
     # ── 交叉分析 ──
-    st.markdown("### 📈 交叉分析")
-    DIMS = [("city","城市"),("top_road_category","道路主类"),
-            ("top_road_subcategory","道路子类"),("period","时段")]
+    st.markdown(T("### 📈 交叉分析"))
+    DIMS = [("city",T("城市")),("top_road_category",T("道路主类")),
+            ("top_road_subcategory",T("道路子类")),("period",T("时段"))]
     lbls, keys = [v for _,v in DIMS], [k for k,_ in DIMS]
     dc1, dc2 = st.columns(2)
-    with dc1: s1 = st.selectbox("维度 1", lbls, key="cx1")
-    with dc2: s2 = st.selectbox("维度 2", lbls, index=1, key="cx2")
+    with dc1: s1 = st.selectbox(T("维度 1"), lbls, key="cx1")
+    with dc2: s2 = st.selectbox(T("维度 2"), lbls, index=1, key="cx2")
     k1, k2 = keys[lbls.index(s1)], keys[lbls.index(s2)]
     if k1 != k2 and all(k in df_f.columns for k in (k1, k2)):
         pivot = df_f.groupby([k1, k2]).size().unstack(fill_value=0)
         st.dataframe(pivot.style.background_gradient(cmap="Blues"), use_container_width=True)
 
-    with st.expander("📋 原始数据"):
+    with st.expander(T("📋 原始数据")):
         cols_show = ["source","folder_path","city","location_name","top_road_category",
                      "top_road_subcategory","collection_time","duration"]
         st.dataframe(df_f[[c for c in cols_show if c in df_f.columns]].head(200),
@@ -1161,17 +1495,17 @@ def page_dashboard():
 
 # ─── 页面 3：新增地点 ─────────────────────────────────────────────────
 _PHOTO_META = {
-    "PHOTO/十堰/麻安高速":     {"scene_type":"环岛+高速路出入口","flight_height":200,  "data_size_gb":20.42},
-    "PHOTO/十堰/园林路":       {"scene_type":"T型路口",         "flight_height":100,  "data_size_gb":16.62},
-    "PHOTO/抚州/旧小区":       {"scene_type":"T型路口",         "flight_height":100,  "data_size_gb":30.0},
-    "PHOTO/抚州/龙山大道":     {"scene_type":"十字路口",        "flight_height":120,  "data_size_gb":25.0},
-    "PHOTO/抚州/街心花园":     {"scene_type":"十字路口",        "flight_height":100,  "data_size_gb":25.0},
-    "PHOTO/贵港/金港大道":     {"scene_type":"拥挤路段",        "flight_height":120,  "data_size_gb":10.0},
-    "PHOTO/贵港/北环金港立交": {"scene_type":"立交桥",          "flight_height":300,  "data_size_gb":10.0},
-    "PHOTO/贵港/工园支路":     {"scene_type":"工业区支路",      "flight_height":120,  "data_size_gb":10.0},
-    "PHOTO/贵港/北环金港匝道": {"scene_type":"合流区",          "flight_height":120,  "data_size_gb":30.0},
-    "PHOTO/安阳/集市路":       {"scene_type":"拥挤路段",        "flight_height":100,  "data_size_gb":4.0},
-    "PHOTO/安阳/台辉高速":     {"scene_type":"高速路",          "flight_height":120,  "data_size_gb":0.45},
+    "PHOTO/十堰/麻安高速":     {"scene_type":T("环岛+高速路出入口"),"flight_height":200,  "data_size_gb":20.42},
+    "PHOTO/十堰/园林路":       {"scene_type":T("T型路口"),         "flight_height":100,  "data_size_gb":16.62},
+    "PHOTO/抚州/旧小区":       {"scene_type":T("T型路口"),         "flight_height":100,  "data_size_gb":30.0},
+    "PHOTO/抚州/龙山大道":     {"scene_type":T("十字路口"),        "flight_height":120,  "data_size_gb":25.0},
+    "PHOTO/抚州/街心花园":     {"scene_type":T("十字路口"),        "flight_height":100,  "data_size_gb":25.0},
+    "PHOTO/贵港/金港大道":     {"scene_type":T("拥挤路段"),        "flight_height":120,  "data_size_gb":10.0},
+    "PHOTO/贵港/北环金港立交": {"scene_type":T("立交桥"),          "flight_height":300,  "data_size_gb":10.0},
+    "PHOTO/贵港/工园支路":     {"scene_type":T("工业区支路"),      "flight_height":120,  "data_size_gb":10.0},
+    "PHOTO/贵港/北环金港匝道": {"scene_type":T("合流区"),          "flight_height":120,  "data_size_gb":30.0},
+    "PHOTO/安阳/集市路":       {"scene_type":T("拥挤路段"),        "flight_height":100,  "data_size_gb":4.0},
+    "PHOTO/安阳/台辉高速":     {"scene_type":T("高速路"),          "flight_height":120,  "data_size_gb":0.45},
 }
 
 def page_photo():
@@ -1186,7 +1520,7 @@ def page_photo():
         df_photo = pd.DataFrame()
 
     if df_photo.empty:
-        st.warning("暂无图片地点数据。请先运行 `python step3_photo_label.py` 完成自动标注。")
+        st.warning(T("暂无图片地点数据。请先运行 `python step3_photo_label.py` 完成自动标注。"))
         st.code("conda activate label\npython step3_photo_label.py", language="bash")
         return
 
@@ -1196,9 +1530,9 @@ def page_photo():
     total_gb = sum(_PHOTO_META.get(fp, {}).get("data_size_gb", 0) for fp in df_photo["folder_path"])
     k1, k2, k3 = st.columns(3)
     for col, icon, val, lbl in [
-        (k1, "📍", n_locs,           "图片地点数"),
-        (k2, "🌆", cities_n,         "覆盖城市"),
-        (k3, "💾", f"{total_gb:.2f} GB", "数据总量"),
+        (k1, "📍", n_locs,           T("图片地点数")),
+        (k2, "🌆", cities_n,         T("覆盖城市")),
+        (k3, "💾", f"{total_gb:.2f} GB", T("数据总量")),
     ]:
         with col:
             st.markdown(f"""<div class="kpi-card" style="background:linear-gradient(135deg,#1a56a8,#0891b2);
@@ -1240,18 +1574,18 @@ def page_photo():
                             unsafe_allow_html=True)
 
                 tags = json.loads(row["secondary_tags_json"]) if row.get("secondary_tags_json") else {}
-                with st.expander("查看/编辑标签"):
+                with st.expander(T("查看/编辑标签")):
                     for sec, sub, attr in [
-                        ("一、道路静态环境","1.2 道路表面","表面类型"),
-                        ("一、道路静态环境","1.3 道路几何","坡度"),
-                        ("一、道路静态环境","1.4 包含车道特征","最宽车道数量"),
-                        ("一、道路静态环境","1.6 道路交叉","交叉类型"),
-                        ("二、交通设施","2.1 交通控制","信号灯"),
-                        ("二、交通设施","2.2 路侧与周边环境","设施"),
-                        ("三、动态目标 (路面状况)","3.1 机动车","类型"),
-                        ("三、动态目标 (路面状况)","3.2 VRU","类型"),
-                        ("四、大气环境","4.1 天气","类型"),
-                        ("四、大气环境","4.3 光照","强度"),
+                        (T("一、道路静态环境"),T("1.2 道路表面"),T("表面类型")),
+                        (T("一、道路静态环境"),T("1.3 道路几何"),T("坡度")),
+                        (T("一、道路静态环境"),T("1.4 包含车道特征"),T("最宽车道数量")),
+                        (T("一、道路静态环境"),T("1.6 道路交叉"),T("交叉类型")),
+                        (T("二、交通设施"),T("2.1 交通控制"),T("信号灯")),
+                        (T("二、交通设施"),T("2.2 路侧与周边环境"),T("设施")),
+                        (T("三、动态目标 (路面状况)"),T("3.1 机动车"),T("类型")),
+                        (T("三、动态目标 (路面状况)"),"3.2 VRU",T("类型")),
+                        (T("四、大气环境"),T("4.1 天气"),T("类型")),
+                        (T("四、大气环境"),T("4.3 光照"),T("强度")),
                     ]:
                         val = tags.get(sec, {}).get(sub, {}).get(attr)
                         if val:
@@ -1265,16 +1599,16 @@ def page_photo():
                         cats = list(TOP_LEVEL_CONFIG.keys())
                         pc1, pc2 = st.columns(2)
                         with pc1:
-                            new_cat = st.selectbox("道路主类", cats,
+                            new_cat = st.selectbox(T("道路主类"), cats,
                                 index=cats.index(top_cat) if top_cat in cats else 0,
-                                key=f"phc_{fp}")
+                                key=f"phc_{fp}", format_func=T)
                         with pc2:
                             subs = TOP_LEVEL_CONFIG.get(new_cat, [])
-                            new_sub = st.selectbox("道路子类", subs,
+                            new_sub = st.selectbox(T("道路子类"), subs,
                                 index=subs.index(top_sub) if top_sub in subs else 0,
-                                key=f"phs_{fp}")
-                        new_cmt = st.text_input("备注", value=row.get("comments","") or "", key=f"phm_{fp}")
-                        if st.form_submit_button("💾 保存复核", type="primary"):
+                                key=f"phs_{fp}", format_func=T)
+                        new_cmt = st.text_input(T("备注"), value=row.get("comments","") or "", key=f"phm_{fp}")
+                        if st.form_submit_button(T("💾 保存复核"), type="primary"):
                             with db_conn() as conn:
                                 conn.execute(
                                     "UPDATE dataset SET top_road_category=?,top_road_subcategory=?,"
@@ -1282,7 +1616,7 @@ def page_photo():
                                     (new_cat, new_sub, new_cmt, datetime.now().isoformat(), fp)
                                 )
                             load_df.clear()
-                            st.success("✅ 已保存"); st.rerun()
+                            st.success(T("✅ 已保存")); st.rerun()
 
 
 def page_add():
@@ -1290,47 +1624,47 @@ def page_add():
                 "或补录已采集地点的额外信息。</div>", unsafe_allow_html=True)
 
     with st.form("add_loc_form"):
-        st.markdown("#### 📋 基本信息")
+        st.markdown(T("#### 📋 基本信息"))
         r1c1, r1c2, r1c3 = st.columns(3)
-        with r1c1: city_input = st.selectbox("城市", list(CITY_MAP.values())+["其他"], key="add_city")
-        with r1c2: year_input = st.text_input("年份", value=str(datetime.now().year), key="add_year")
-        with r1c3: loc_name   = st.text_input("地点名称 (英文/编号)", key="add_loc")
+        with r1c1: city_input = st.selectbox(T("城市"), list(CITY_MAP.values())+[T("其他")], key="add_city")
+        with r1c2: year_input = st.text_input(T("年份"), value=str(datetime.now().year), key="add_year")
+        with r1c3: loc_name   = st.text_input(T("地点名称 (英文/编号)"), key="add_loc")
 
         r2c1, r2c2 = st.columns(2)
-        with r2c1: coll_date  = st.date_input("采集日期", key="add_date")
+        with r2c1: coll_date  = st.date_input(T("采集日期"), key="add_date")
         with r2c2: coll_hour  = st.slider("采集小时", 0, 23, 9, key="add_hour")
 
-        duration_min   = st.number_input("视频总时长 (分钟)", min_value=0.0, step=1.0, key="add_dur")
-        comments       = st.text_area("备注", height=60, key="add_cmt")
+        duration_min   = st.number_input(T("视频总时长 (分钟)"), min_value=0.0, step=1.0, key="add_dur")
+        comments       = st.text_area(T("备注"), height=60, key="add_cmt")
 
-        st.markdown("#### 🖼️ 图片")
-        img_mode       = st.radio("图片来源", ["上传图片","输入路径"], horizontal=True, key="add_imgmode")
+        st.markdown(T("#### 🖼️ 图片"))
+        img_mode       = st.radio(T("图片来源"), [T("上传图片"),T("输入路径")], horizontal=True, key="add_imgmode")
         uploaded_file  = None
         img_path_input = ""
         if img_mode == "上传图片":
             uploaded_file = st.file_uploader("上传代表图 (JPG/PNG)", type=["jpg","jpeg","png"], key="add_file")
         else:
-            img_path_input = st.text_input("图片绝对路径", key="add_imgpath")
+            img_path_input = st.text_input(T("图片绝对路径"), key="add_imgpath")
 
-        st.markdown("#### 🛣️ 道路类型")
+        st.markdown(T("#### 🛣️ 道路类型"))
         cats = list(TOP_LEVEL_CONFIG.keys())
         ac1, ac2 = st.columns(2)
-        with ac1: top_cat = st.selectbox("道路主类", cats, key="add_cat")
-        with ac2: top_sub = st.selectbox("道路子类", TOP_LEVEL_CONFIG[top_cat], key="add_sub")
+        with ac1: top_cat = st.selectbox(T("道路主类"), cats, key="add_cat", format_func=T)
+        with ac2: top_sub = st.selectbox(T("道路子类"), TOP_LEVEL_CONFIG[top_cat], key="add_sub", format_func=T)
 
-        st.markdown("#### 📍 静态标签")
+        st.markdown(T("#### 📍 静态标签"))
         static_tags  = render_schema_section(STATIC_SCHEMA, {}, "add_st")
-        st.markdown("#### 🎬 动态标签")
+        st.markdown(T("#### 🎬 动态标签"))
         dynamic_tags = render_schema_section(DYNAMIC_SCHEMA, {}, "add_dy")
 
-        submitted = st.form_submit_button("💾 保存新地点", type="primary", use_container_width=True)
+        submitted = st.form_submit_button(T("💾 保存新地点"), type="primary", use_container_width=True)
 
     if submitted:
         if not loc_name.strip():
-            st.error("地点名称不能为空"); return
+            st.error(T("地点名称不能为空")); return
 
         final_img_path = ""
-        if img_mode == "上传图片" and uploaded_file:
+        if img_mode == T("上传图片") and uploaded_file:
             UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
             save_path = UPLOAD_DIR / f"{loc_name}_{uploaded_file.name}"
             save_path.write_bytes(uploaded_file.read())
@@ -1658,8 +1992,12 @@ details summary {
 
 # ─── 主入口 ──────────────────────────────────────────────────────────
 def main():
+    # ── 语言默认值 ──
+    if "lang" not in st.session_state:
+        st.session_state.lang = "zh"
+
     st.set_page_config(
-        page_title="驭研科技大规模自然驾驶数据集统计平台",
+        page_title=T("驭研科技大规模自然驾驶数据集统计平台"),
         page_icon="🛰️",
         layout="wide",
         initial_sidebar_state="collapsed",
@@ -1667,20 +2005,42 @@ def main():
     st.markdown(CSS, unsafe_allow_html=True)
     init_db()
 
-    # Brand Header（与截图完全一致）
-    st.markdown("""
+    # ── Brand Header + 语言切换 ──
+    # 用 Streamlit columns 把右上角的 EN / 中文 toggle 固定到 header
+    title_zh = "驭研科技大规模自然驾驶数据集统计平台"
+    title_en = "DRIVEResearch · Large-Scale Naturalistic Driving Dataset Platform"
+    display_title = title_en if st.session_state.lang == "en" else title_zh
+    badge_text = "🗺️ Aerial · ODD Labeling"
+
+    st.markdown(f"""
 <div class="brand-header">
   <div class="tc-tl"></div><div class="tc-br"></div>
   <div class="brand-logo">🛰️</div>
   <div class="brand-text">
-    <div class="brand-title">驭研科技大规模自然驾驶数据集统计平台</div>
+    <div class="brand-title">{display_title}</div>
     <div class="brand-sub">DRIVEResearch · Operational Design Domain Labeling Platform</div>
   </div>
-  <div class="brand-badge">🗺️ Aerial · ODD Labeling</div>
+  <div class="brand-badge">{badge_text}</div>
 </div>
 """, unsafe_allow_html=True)
 
-    tab1, tab2 = st.tabs(["📊 统计看板", "🏷️ 地点标注"])
+    # Language toggle — 右上对齐
+    _sp, _tog = st.columns([10, 1])
+    with _tog:
+        new_lang = st.radio(
+            " ",
+            options=["zh", "en"],
+            format_func=lambda x: "中文" if x == "zh" else "EN",
+            index=0 if st.session_state.lang == "zh" else 1,
+            horizontal=True,
+            label_visibility="collapsed",
+            key="_lang_picker",
+        )
+        if new_lang != st.session_state.lang:
+            st.session_state.lang = new_lang
+            st.rerun()
+
+    tab1, tab2 = st.tabs([T("📊 统计看板"), T("🏷️ 地点标注")])
     with tab1:
         page_dashboard()
     with tab2:
