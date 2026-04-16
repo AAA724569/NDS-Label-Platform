@@ -1,17 +1,36 @@
-labeling_data_v2.db
+# ─── Python ────────────────────────────────────────────────
 __pycache__/
 *.pyc
-vlm_cache.json
-vlm_run.log
-streamlit_2.log
+*.pyo
+*.pyd
+*.egg-info/
+.venv/
+venv/
+env/
+
+# ─── OS / Editor ──────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+.claude/
+
+# ─── Logs ─────────────────────────────────────────────────
 *.log
+
+# ─── Local working files (never commit) ───────────────────
 uploaded_images/
 neiwang/
 fix_missing_durations.py
 fix_missing_frames.py
 fix_propagate_labels.py
-copy_frames.py
-GBT+45312-2025(2).pdf
-.claude/
 fix_photo_db.py
+copy_frames.py
 streamlit_app.py
+
+# ─── Standard PDF (copyright) ─────────────────────────────
+GBT+45312-2025(2).pdf
+
+# ─── Legacy / intermediate caches ─────────────────────────
+labeling_data_v2.db
+vlm_cache.json

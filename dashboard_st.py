@@ -10,7 +10,7 @@ ODD 人工标注平台 v3
   · _field 签名简化，去掉无用参数 schema_dict
   · 去掉未使用的 import shutil / parse_time
 
-运行：conda activate nds && streamlit run label_platform_v3.py
+运行：conda activate nds && streamlit run dashboard_st.py
 """
 import json
 import os
