@@ -44,10 +44,13 @@ I18N_EN = {
     "📋 原始数据": "📋 Raw Data",
 
     # ── 平台标题 ──────────────────────────────────────────────
-    "驭研科技大规模自然驾驶数据集数据管理平台":
-        "DRIVEResearch Large-Scale Naturalistic Driving Dataset Management Platform",
+    "驭研科技自然驾驶数据集数据统计平台":
+        "DRIVEResearch Naturalistic Driving Dataset Statistics Platform",
+    # 兼容旧版文件里可能出现的老标题（docstring / page_title fallback）
     "驭研科技大规模自然驾驶数据集统计平台":
-        "DRIVEResearch Large-Scale Naturalistic Driving Dataset Management Platform",
+        "DRIVEResearch Naturalistic Driving Dataset Statistics Platform",
+    "驭研科技大规模自然驾驶数据集数据管理平台":
+        "DRIVEResearch Naturalistic Driving Dataset Statistics Platform",
 
     # ── 顶部导航（nav）────────────────────────────────────────
     "主站":       "Main site",
@@ -2460,12 +2463,20 @@ PAGES = {
 
 
 def main():
-    # ── 语言默认值 ──
+    # ── 语言默认值 + URL 覆盖（必须在 set_page_config 之前，否则浏览器
+    #    tab 标题永远用 session 默认 lang） ──
     if "lang" not in st.session_state:
         st.session_state.lang = "zh"
+    qp = st.query_params
+    qp_lang = qp.get("lang")
+    if qp_lang in ("zh", "en") and st.session_state.lang != qp_lang:
+        st.session_state.lang = qp_lang
+    active = qp.get("page", "dashboard")
+    if active not in PAGES:
+        active = "dashboard"
 
     st.set_page_config(
-        page_title=T("驭研科技大规模自然驾驶数据集数据管理平台"),
+        page_title=T("驭研科技自然驾驶数据集数据统计平台"),
         # Favicon — hosted on driveresearch.tech for visual consistency
         # with the main website tab icon.
         page_icon="https://driveresearch.tech/images/logo-square.png",
@@ -2474,16 +2485,6 @@ def main():
     )
     st.markdown(CSS, unsafe_allow_html=True)
     init_db()
-
-    # ── Routing via query params (survives hard reload from nav link clicks) ──
-    qp = st.query_params
-    active = qp.get("page", "dashboard")
-    if active not in PAGES:
-        active = "dashboard"
-    # If URL carries ?lang=en/zh, honor it (so nav clicks preserve language)
-    qp_lang = qp.get("lang")
-    if qp_lang in ("zh", "en") and st.session_state.lang != qp_lang:
-        st.session_state.lang = qp_lang
 
     # ══════════════════════════════════════════════════════
     # Nav — 视觉与 driveresearch.tech 对齐
@@ -2540,7 +2541,7 @@ def main():
 
     # ── 平台全名 · 中英双语（按当前 lang 显示）──
     st.markdown(
-        f'<div class="platform-title">{T("驭研科技大规模自然驾驶数据集数据管理平台")}</div>',
+        f'<div class="platform-title">{T("驭研科技自然驾驶数据集数据统计平台")}</div>',
         unsafe_allow_html=True,
     )
 
