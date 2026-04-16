@@ -58,6 +58,29 @@ I18N_EN = {
     "标注":       "Tagging",
     "智能问答":   "AI Q&A",
 
+    # ── Tagging 页 · 列表与进度 ───────────────────────────────
+    "进度":        "Progress",
+    "张":          "images",
+    "🗺️ 地点列表": "🗺️ Locations",
+    "📅 天":       "📅 days",
+    "天":          "days",
+    "张代表图":    "representative frames",
+    "总时长":      "total duration",
+    "已标注":      "labeled",
+    "未找到索引文件": "Index file not found",
+
+    # ── Tagging 页 · 详情右侧 ─────────────────────────────────
+    "📍 静态标签（整个地点）":     "📍 Static tags (whole location)",
+    "🎬 动态标签（逐图）":         "🎬 Dynamic tags (per frame)",
+    "道路几何、车道、设施等物理特征不随时间变化，填写一次后保存到本地点所有代表图。":
+        "Physical features (road geometry, lanes, facilities) do not change over time. Fill once; applied to all representative frames.",
+    "天气、光照、车辆等随时间变化，每张图独立标注。静态标签会自动沿用（请先完成静态标签）。":
+        "Weather, lighting, vehicles change over time — label each frame independently. Static tags are inherited (complete static tags first).",
+    "💾 保存静态标签 → 应用到本地点全部": "💾 Save static tags → apply to all",
+    "张代表图（按钮）": "representative frames",
+    "✅ 静态标签已保存并应用到": "✅ Static tags saved and applied to",
+    "张图": "frames",
+
     # ── AI Q&A 页面 ───────────────────────────────────────────
     "🤖 智能问答":            "🤖 AI Q&A",
     "基于 Claude 的数据集对话助手，可解答数据覆盖范围、ODD 标签分布、采集地点等问题":
@@ -832,7 +855,7 @@ def _cl() -> dict:
 def page_label():
     loc_groups = load_location_groups()
     if not loc_groups:
-        st.error(f"未找到索引文件：{INDEX_FILE}"); return
+        st.error(f"{T('未找到索引文件')}：{INDEX_FILE}"); return
 
     labeled_fps = load_labeled_fps()
 
@@ -840,13 +863,16 @@ def page_label():
     _fc1, _fc2 = st.columns([2, 2])
     with _fc1:
         all_cities = sorted({v["city"] for v in loc_groups.values()})
-        sel_city   = st.multiselect(T("🌆 城市过滤"), all_cities, default=all_cities, key="lbl_city")
+        # format_func=T 让显示文本走翻译，底层存储值保持中文
+        sel_city   = st.multiselect(T("🌆 城市过滤"), all_cities,
+                                    default=all_cities, key="lbl_city",
+                                    format_func=T)
     filtered     = {_k: _v for _k, _v in sorted(loc_groups.items()) if _v["city"] in sel_city}
     total_reps   = sum(len(_v["all_reps"]) for _v in filtered.values())
     labeled_reps = sum(1 for _v in filtered.values()
                        for _r in _v["all_reps"] if _r["folder_path"] in labeled_fps)
     with _fc2:
-        st.markdown(f"**📊 进度：{labeled_reps} / {total_reps} 张**")
+        st.markdown(f"**📊 {T('进度')}：{labeled_reps} / {total_reps} {T('张')}**")
         st.progress(labeled_reps / total_reps if total_reps else 0)
 
     st.markdown("<hr style='margin:6px 0 10px'>", unsafe_allow_html=True)
@@ -855,12 +881,14 @@ def page_label():
     _col_l, _col_r = st.columns([1, 3])
 
     with _col_l:
-        st.markdown("<div class='loc-list-header'>🗺️ 地点列表</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='loc-list-header'>{T('🗺️ 地点列表')}</div>",
+                    unsafe_allow_html=True)
         for _k, _v in filtered.items():
             _nr  = len(_v["all_reps"])
             _nd  = sum(1 for _r in _v["all_reps"] if _r["folder_path"] in labeled_fps)
             _dot = "✅" if _nd == _nr else ("🔶" if _nd > 0 else "⬜")
-            if st.button(f"{_dot} {_v['city']} · {_k}  ({_nd}/{_nr})",
+            # T(_v['city']) 翻译城市名，ASCII 的 key _k 原样保留
+            if st.button(f"{_dot} {T(_v['city'])} · {_k}  ({_nd}/{_nr})",
                          key=f"loc_{_k}", use_container_width=True):
                 st.session_state.sel_loc = _k
 
@@ -879,12 +907,12 @@ def page_label():
         n_done = sum(1 for r in loc["all_reps"] if r["folder_path"] in labeled_fps)
         st.markdown(
             f"<div class='loc-header'>"
-            f"<span class='loc-city'>{loc['city']}</span>"
+            f"<span class='loc-city'>{T(loc['city'])}</span>"
             f"<span class='loc-name'>{l2}</span>"
-            f"<span class='loc-stat'>📅 {len(loc['days'])} 天 &nbsp;|&nbsp; "
-            f"🖼 {n_rep} 张代表图 &nbsp;|&nbsp; "
-            f"⏱ {fmt_dur(loc['total_duration'])} 总时长 &nbsp;|&nbsp; "
-            f"{'✅' if n_done==n_rep else '🔶'} {n_done}/{n_rep} 已标注</span>"
+            f"<span class='loc-stat'>📅 {len(loc['days'])} {T('天')} &nbsp;|&nbsp; "
+            f"🖼 {n_rep} {T('张代表图')} &nbsp;|&nbsp; "
+            f"⏱ {fmt_dur(loc['total_duration'])} {T('总时长')} &nbsp;|&nbsp; "
+            f"{'✅' if n_done==n_rep else '🔶'} {n_done}/{n_rep} {T('已标注')}</span>"
             f"</div>", unsafe_allow_html=True
         )
 
@@ -892,8 +920,9 @@ def page_label():
 
         # ── Tab1 静态 ──
         with tab_static:
-            st.markdown("<div class='tip'>道路几何、车道、设施等物理特征不随时间变化，"
-                        "填写一次后保存到本地点所有代表图。</div>", unsafe_allow_html=True)
+            st.markdown(
+                f"<div class='tip'>{T('道路几何、车道、设施等物理特征不随时间变化，填写一次后保存到本地点所有代表图。')}</div>",
+                unsafe_allow_html=True)
             ex = get_location_static(l2)
             cats = list(TOP_LEVEL_CONFIG.keys())
             with st.form(key=f"static_{l2}"):
@@ -909,17 +938,18 @@ def page_label():
                         key=f"ssub_{l2}", format_func=T)
                 static_tags = render_schema_section(STATIC_SCHEMA, ex.get("sections",{}), f"st_{l2}")
                 submitted   = st.form_submit_button(
-                    f"💾 保存静态标签 → 应用到本地点全部 {n_rep} 张代表图",
+                    f"{T('💾 保存静态标签 → 应用到本地点全部')} {n_rep} {T('张代表图')}",
                     type="primary", use_container_width=True)
             if submitted:
                 save_static_to_location(l2, loc, top_cat, top_sub, static_tags)
                 load_labeled_fps.clear(); load_df.clear()
-                st.success(f"✅ 静态标签已保存并应用到 {n_rep} 张图！"); st.rerun()
+                st.success(f"{T('✅ 静态标签已保存并应用到')} {n_rep} {T('张图')}！"); st.rerun()
 
         # ── Tab2 动态 ──
         with tab_dynamic:
-            st.markdown("<div class='tip'>天气、光照、车辆等随时间变化，每张图独立标注。"
-                        "静态标签会自动沿用（请先完成静态标签）。</div>", unsafe_allow_html=True)
+            st.markdown(
+                f"<div class='tip'>{T('天气、光照、车辆等随时间变化，每张图独立标注。静态标签会自动沿用（请先完成静态标签）。')}</div>",
+                unsafe_allow_html=True)
             loc_static = get_location_static(l2)
 
             for day in loc["days"]:
