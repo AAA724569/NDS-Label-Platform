@@ -44,9 +44,12 @@ I18N_EN = {
     "📋 原始数据": "📋 Raw Data",
 
     # ── 平台标题 ──────────────────────────────────────────────
+    # 完整标题（用于 browser tab / page_title）
     "驭研科技自然驾驶数据集数据统计平台":
         "DRIVEResearch Naturalistic Driving Dataset Statistics Platform",
-    # 兼容旧版文件里可能出现的老标题（docstring / page_title fallback）
+    # 简写标题（nav 内 logo 右侧）
+    "数据统计平台":  "Statistics Platform",
+    # 兼容旧版文件里可能出现的老标题
     "驭研科技大规模自然驾驶数据集统计平台":
         "DRIVEResearch Naturalistic Driving Dataset Statistics Platform",
     "驭研科技大规模自然驾驶数据集数据管理平台":
@@ -1923,20 +1926,44 @@ section[data-testid="stMain"]        { padding-top: 0 !important; }
 .drh-nav-links a.active { opacity: 1; color: #e8a08c; }
 .drh-nav-lang-slot      { width: 110px; }
 
-/* ── 平台全名标题条 ───────────────────────────────────────── */
-.platform-title {
-    text-align: center;
-    padding: 18px 20px 14px;
-    margin: 0 0 24px;
-    border-bottom: 1px solid #eae9e4;
-    color: #0f1923;
-    font-size: clamp(15px, 2.2vw, 20px);
-    font-weight: 600;
+/* ── Nav brand 组：logo | 简写平台名 ───────────────────────
+   设计意图：
+   - logo 保持 38px 高度，点击回官网（title tooltip "返回主站"）
+   - 竖线分隔符用 rgba 白，低透明度，不抢戏
+   - 简写标题 Inter 15px medium，淡白 0.85 透明度，与 nav 链接平级
+   - 手机端（≤640px）只保留 logo，简写标题和竖线折叠，避免挤爆
+   ──────────────────────────────────────────────────────── */
+.drh-nav-brand {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-shrink: 0;
+}
+.drh-nav-divider {
+    width: 1px;
+    height: 22px;
+    background: rgba(250, 249, 245, 0.22);
+    flex-shrink: 0;
+}
+.drh-nav-title {
+    color: #faf9f5;
+    opacity: 0.88;
+    font-size: 15px;
+    font-weight: 500;
     letter-spacing: 0.4px;
-    line-height: 1.45;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Noto Sans SC', sans-serif;
+    white-space: nowrap;
+    line-height: 1;
+    padding-top: 1px;   /* 视觉与 logo 基线对齐 */
+}
+@media (max-width: 900px) {
+    .drh-nav-title { font-size: 14px; }
+    .drh-nav-brand { gap: 12px; }
+    .drh-nav-divider { height: 18px; }
 }
 @media (max-width: 640px) {
-    .platform-title { font-size: 13px; padding: 12px 16px 10px; }
+    /* 手机上只保留 logo */
+    .drh-nav-divider, .drh-nav-title { display: none; }
 }
 
 /* ── AI Q&A 页面 ──────────────────────────────────────────── */
@@ -2646,10 +2673,14 @@ def main():
     st.markdown(f"""
 <nav class="drh-nav">
   <div class="drh-nav-inner">
-    <a href="https://driveresearch.tech/" target="_blank" rel="noopener" class="drh-nav-logo"
-       title="{T('返回主站')}">
-      <img src="https://driveresearch.tech/images/logo-white.png" alt="DRIVEResearch">
-    </a>
+    <div class="drh-nav-brand">
+      <a href="https://driveresearch.tech/" target="_blank" rel="noopener" class="drh-nav-logo"
+         title="{T('返回主站')}">
+        <img src="https://driveresearch.tech/images/logo-white.png" alt="DRIVEResearch">
+      </a>
+      <span class="drh-nav-divider" aria-hidden="true"></span>
+      <span class="drh-nav-title">{T('数据统计平台')}</span>
+    </div>
     <ul class="drh-nav-links">
       {nav_li}
       <li><a href="https://github.com/AutoZYX/NDS-Label-Platform" target="_blank" rel="noopener">{gh_label}</a></li>
@@ -2677,13 +2708,7 @@ def main():
         st.query_params["page"] = active
         st.rerun()
 
-    # ── 平台全名 · 中英双语（按当前 lang 显示）──
-    st.markdown(
-        f'<div class="platform-title">{T("驭研科技自然驾驶数据集数据统计平台")}</div>',
-        unsafe_allow_html=True,
-    )
-
-    # ── Render active page ──
+    # ── Render active page（平台全名改做 nav 内简写，不再单独渲染大标题）──
     PAGES[active]["render"]()
 
 
