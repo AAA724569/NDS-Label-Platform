@@ -98,7 +98,8 @@ def database():
                         deleted_at TIMESTAMPTZ
                     )
                 """)
-                setup.execute(MIGRATION.read_text(encoding="utf-8"))
+                for migration in sorted(MIGRATION.parent.glob('*.sql')):
+                    setup.execute(migration.read_text(encoding="utf-8"))
             yield connection_options
         finally:
             if (data / "PG_VERSION").exists():
