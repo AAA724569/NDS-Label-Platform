@@ -281,7 +281,7 @@ def test_prompt_excludes_legacy_absence_values_without_changing_original_taxonom
     assert any("无" in item["values"] for item in original_definitions)
     assert all("无" not in item["values"] for item in definitions)
     assert schema.FIELD_DEFINITIONS == original_definitions
-    assert schema.PROMPT_VERSION == "battery-frame-v3"
+    assert schema.PROMPT_VERSION == "battery-frame-v4"
 
 
 def test_prompt_absence_examples_validate_with_empty_values():
@@ -314,9 +314,9 @@ def test_prompt_positive_examples_validate_with_the_full_template():
         label(payload, example["field"]).update(example)
     assert label(payload, "top_road_category")["state"] == "observed"
     assert label(payload, "top_road_category")["values"] == ["城市道路"]
-    assert label(payload, "top_road_subcategory")["state"] == "unknown"
-    assert label(payload, "top_road_subcategory")["values"] == []
-    assert label(payload, "top_road_subcategory")["reason"]
+    assert label(payload, "top_road_subcategory")["state"] == "observed"
+    assert label(payload, "top_road_subcategory")["values"] == ["主干路"]
+    assert label(payload, "top_road_subcategory")["reason"].startswith('视觉推断：')
     assert label(payload, "road.surface.condition")["state"] == "observed"
     assert label(payload, "road.surface.condition")["values"] == ["干燥"]
     assert schema.validate_annotation(payload) == []
@@ -337,6 +337,34 @@ def test_prompt_provides_complete_parent_mapping_for_subcategory_selection():
     assert schema.validate_annotation(payload)
     observe(payload, "top_road_subcategory", ["主干路"])
     assert schema.validate_annotation(payload) == []
+
+
+@pytest.mark.parametrize('parent_state,parent_values', [('observed', ['城市道路']), ('unknown', [])])
+def test_subtype_prompt_limits_output_to_road_pair_and_preserves_existing_parent_context(parent_state, parent_values):
+    schema = contract()
+    parent = {'field': 'top_road_category', 'state': parent_state, 'values': parent_values,
+              'scope': 'frame', 'origin': 'model', 'evidence': 'representative', 'reason': '原始道路依据'}
+    original = deepcopy(parent)
+    prompt = schema.build_road_subtype_prompt(parent)
+    decoder = json.JSONDecoder()
+    context, _ = decoder.raw_decode(prompt.split('【现有道路大类 JSON】\n', 1)[1])
+    response, _ = decoder.raw_decode(prompt.split('【输出结构 JSON】\n', 1)[1])
+    allowed, _ = decoder.raw_decode(prompt.split('【道路大类与允许子类 JSON】\n', 1)[1])
+    assert parent == original == context
+    assert [x['field'] for x in response['labels']] == ['top_road_category', 'top_road_subcategory']
+    assert response['labels'][0] == parent
+    assert allowed['城市道路'] == ['快速路', '主干路', '次干路', '支路', '街巷']
+    assert schema.ROAD_SUBTYPE_PROMPT_VERSION == 'road-subtype-visual-v1'
+    full = unknown_frame()
+    for entry in response['labels']:
+        label(full, entry['field']).update(entry)
+    assert schema.validate_annotation(full) == []
+
+
+@pytest.mark.parametrize('parent', [None, {}, {'field': 'top_road_category', 'state': 'observed', 'values': ['invented']}])
+def test_subtype_prompt_rejects_unsupported_parent_context(parent):
+    with pytest.raises(ValueError):
+        contract().build_road_subtype_prompt(parent)
 
 
 @pytest.mark.parametrize("code", FIELD_CODES)

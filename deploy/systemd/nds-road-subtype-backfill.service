@@ -1,0 +1,17 @@
+[Unit]
+Description=NDS visual road-subtype backfill on existing representative frames
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/stu1/.codex/worktrees/aerial-annotation-schema/CiteLabelPlatform
+EnvironmentFile=/home/stu1/.config/nds-annotation-worker.env
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/home/stu1/Projects/NDS-Statistics-Platform/.venv/bin/python road_subtype_backfill.py --concurrency 32
+Restart=on-failure
+RestartSec=15
+RestartPreventExitStatus=78
+TimeoutStopSec=120
+KillSignal=SIGTERM
+UMask=0077
+Nice=10

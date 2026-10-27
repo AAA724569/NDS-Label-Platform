@@ -12,7 +12,8 @@ import json
 
 
 SCHEMA_VERSION = "aerial_annotation_v1"
-PROMPT_VERSION = "battery-frame-v3"
+PROMPT_VERSION = "battery-frame-v4"
+ROAD_SUBTYPE_PROMPT_VERSION = "road-subtype-visual-v1"
 
 TOP_LEVEL_CONFIG = {'区域': ['封闭园区', '交通管制区域', '开放道路'],
  '城市道路': ['快速路', '主干路', '次干路', '支路', '街巷'],
@@ -391,9 +392,9 @@ def build_annotation_prompt() -> str:
             "reason": "主体道路位于可辨认的城市建成区",
         },
         {
-            "field": "top_road_subcategory", "state": "unknown", "values": [],
+            "field": "top_road_subcategory", "state": "observed", "values": ["主干路"],
             "scope": "frame", "origin": "model", "evidence": "representative",
-            "reason": "单帧无法核实主干路、次干路等道路功能等级",
+            "reason": "视觉推断：主体道路具有多车道、中央分隔和较大交叉口，按城市主干路场景估计",
         },
         {
             "field": "road.surface.condition", "state": "observed", "values": ["干燥"],
@@ -410,7 +411,7 @@ def build_annotation_prompt() -> str:
         for definition in FIELD_DEFINITIONS
     ]}
     rules = """你是一名无人机航拍道路图像标注员。输入是一块电池采集文件夹的一张代表帧。
-只标注这张代表帧中可见的事实，生成待人工审核的候选结果。仅输出 JSON 对象，禁止 Markdown、解释和额外全局字段。
+依据这张代表帧标注可见内容；道路子类允许依据可见结构作视觉推断，结果用于自动场景统计。仅输出 JSON 对象，禁止 Markdown、解释和额外全局字段。
 
 【固定格式与状态】
 1. 输出 {"labels": [...]}，必须恰好包含以下全部 27 个字段，每个字段一次，不得遗漏或重复。
@@ -418,7 +419,7 @@ def build_annotation_prompt() -> str:
 3. state 仅允许 observed、not_observed、unknown、unlabeled、not_applicable。
    state 始终填写这五个英文状态码之一，绝不能填写任何中文枚举值。
    “城市道路”“主干路”“沥青”“干燥”等是 values 的选项，不能写成 state；有可见依据时使用 state="observed" 并将中文值放进 values 数组。
-   observed：本帧确实可见，values 非空；只能选字段定义里的中文值。multi=false 只选一值，multi=true 可选多值。
+   observed：本帧确实可见，或道路子类按下述规则作出了视觉推断，values 非空；只能选字段定义里的中文值。multi=false 只选一值，multi=true 可选多值。
    not_observed：相关区域清楚可见，确认本帧未看到该目标或设施，values=[]。原始选项“无”统一使用此状态，不放入 values。
    unknown：遮挡、分辨率不足、视角限制或无可靠依据，values=[]，用 reason 说明原因；无法判断不能写成未出现。
    unlabeled：明确未完成该项标注，values=[]；不能用它代替 unknown。
@@ -432,8 +433,10 @@ def build_annotation_prompt() -> str:
 6. 选择图像主体道路及其主要行驶方向作为车道判断对象。最宽车道数量只统计该方向可见道路最宽断面；不把对向车道、辅路、匝道或邻近道路相加。
    车道类别只在可辨认的标线、标志或结构支持时选择；不能由位置猜测公交、HOV、潮汐、应急等用途。
 7. top_road_category 与 top_road_subcategory 均为单选，子类必须属于所选大类；大类 unknown 时子类不得 observed。
-   无法凭本帧确认道路等级、用途或管制属性时用 unknown，不凭车道数量猜测高速公路、主干路等法定等级。
-   如果可确认“城市道路”大类，却无法核实主干路/次干路等功能等级，则大类 observed + ["城市道路"]，子类 unknown + [] 并提供 reason。
+   道路子类采用视觉推断，不要求外部地图、道路登记或规划资料。主体道路清晰时，应综合车道规模、中央隔离、交叉口、出入口控制、沿线建筑和服务关系，选择最可能的一种对应子类。
+   不因缺少法定等级证明而填写 unknown；道路不可辨认、严重遮挡或画面不能支持任何对应子类时才保留 unknown。observed 子类必须有非空 reason，以“视觉推断：”开头并说明可见依据；不声称完成了官方等级核验。
+   城市道路：快速路侧重分隔、控制出入及连续通行结构；主干路侧重宽阔多车道城市走廊和较大路口；次干路侧重区域集散；支路侧重地块内部交通及沿线出入口；街巷侧重小尺度、窄路、密集沿街服务。综合判断，不把单一车道数量作为唯一依据。
+   公路：高速公路侧重中央分隔、封闭和匝道控制；一级公路侧重较高标准分隔式干线；二级公路侧重双向一般干线；三级、四级侧重较窄、低标准的地方连接道路。按可见结构选择最可能等级并说明是视觉估计。
    所有 observed 子类必须从下方父类映射中对应所选大类的列表选择；“开放道路”属于“区域”，不得与“城市道路”大类组合。
 8. 坡度 road.geometry.slope、横坡 road.geometry.crossfall、车道宽度 road.lane.width、气温 environment.temperature
    本流程没有标定、实测、定位或传感器数据，必须 state=unknown、values=[] 且提供 reason。
@@ -454,7 +457,7 @@ def build_annotation_prompt() -> str:
         + "\n\n以下正向示例仅演示英文 state 与中文 values 的位置；只有图像支持时才能使用示例的值。"
         + "\n【可观察正向示例 JSON】\n"
         + json.dumps(positive_examples, ensure_ascii=False, indent=2)
-        + "\n\n以下映射给出各道路大类允许的子类；不能确认等级或属性时使用 unknown，不选最接近的子类。"
+        + "\n\n以下映射给出各道路大类允许的子类；主体道路清晰时按视觉特征选择最可能子类，只有画面证据不足时使用 unknown。"
         + "\n【道路大类与允许子类 JSON】\n"
         + json.dumps(TOP_LEVEL_CONFIG, ensure_ascii=False, indent=2)
         + "\n\n【字段定义 JSON】\n"
@@ -463,3 +466,35 @@ def build_annotation_prompt() -> str:
         + json.dumps(template, ensure_ascii=False, indent=2)
         + "\n以上为完整结构模板。依据本帧更新各项状态、值和原因；保留全部字段和固定来源，返回单个 JSON 对象。"
     )
+
+
+def build_road_subtype_prompt(parent_label: dict) -> str:
+    """Classify only the road pair, retaining any existing observed parent."""
+    if (not isinstance(parent_label, dict) or parent_label.get('field') != 'top_road_category'
+            or parent_label.get('state') not in ('observed', 'unknown')):
+        raise ValueError('Unsupported road category context')
+    state, values = parent_label['state'], parent_label.get('values')
+    if (not isinstance(values, list) or (state == 'unknown' and values)
+            or (state == 'observed' and (len(values) != 1 or not isinstance(values[0], str)
+                                       or values[0] not in TOP_LEVEL_CONFIG))):
+        raise ValueError('Unsupported road category context')
+    template = {'labels': [deepcopy(parent_label), {
+        'field': 'top_road_subcategory', 'state': 'unknown', 'values': [],
+        'scope': 'frame', 'origin': 'model', 'evidence': 'representative',
+        'reason': '画面无法辨认主体道路',
+    }]}
+    return """你是无人机航拍道路场景标注员。本次只补全道路大类/子类两个字段，不改其他标签。
+道路子类允许依据画面特征作视觉推断，不要求道路登记、规划资料或法定等级证明。
+只输出 {"labels": [道路大类对象, 道路子类对象]}，恰好两个字段，禁止 Markdown 和额外字段。
+1. 现有大类若为 observed，必须逐字段原样复制现有大类对象，包括其原始 reason（有则保留、无则不增加），只推断其允许的子类。
+2. 现有大类若为 unknown，可同时视觉推断主体道路大类和对应子类；新推断的两项均须提供以“视觉推断：”开头的 reason。
+3. 主体道路清楚时，综合中央分隔、车道规模、交叉口、沿线建筑、出入口和连接关系，选最可能的一种子类。不得因为没有官方等级资料就返回 unknown。
+4. 城市道路：快速路倾向控制出入、分隔及连续通行；主干路倾向宽阔多车道城市走廊、大路口；次干路倾向区域集散；支路倾向内部交通和沿线出入口；街巷倾向窄小街道及密集沿街服务。不能只用车道数量判定。
+5. 公路：高速倾向封闭、分隔及匝道出入；一级倾向较高标准的分隔式干线；二级倾向普通双向干线；三级/四级倾向较窄、低标准地方连接道路。按可见特征选择最可能值。
+6. 区域、停车区域、乡村道路、其他道路和自动驾驶场景，依据围合、停车组织、服务场所及可见道路用途选择映射内子类。
+7. state 仅可用 observed 或 unknown，values 始终为数组；observed 只能有一个映射内中文值，unknown 必须是空数组。大类 unknown 时子类不得 observed。
+8. 每项固定 scope="frame"、origin="model"、evidence="representative"。observed 子类 reason 必须以“视觉推断：”开头，说明本帧可见依据；unknown 必须说明实际图像不足。保留观测范围，不虚构地图、测量或官方核实。
+9. 只有没有可辨认主体道路、严重遮挡或画面不足以支持任何子类时才返回 unknown；不要把结构模板的 unknown 直接当成答案。
+""" + '\n【现有道路大类 JSON】\n' + json.dumps(parent_label, ensure_ascii=False, indent=2) \
+        + '\n【道路大类与允许子类 JSON】\n' + json.dumps(TOP_LEVEL_CONFIG, ensure_ascii=False, indent=2) \
+        + '\n【输出结构 JSON】\n' + json.dumps(template, ensure_ascii=False, indent=2)

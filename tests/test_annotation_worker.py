@@ -51,3 +51,31 @@ def test_only_official_model_response_with_complete_content_is_accepted():
     response['model']='other-provider'
     with pytest.raises(ValueError):
         parse_model_response(response)
+
+
+@pytest.mark.parametrize('custom', [False, True])
+def test_model_transport_sends_selected_prompt_and_response_budget_without_exposing_key(tmp_path, monkeypatch, custom):
+    import annotation_worker as worker
+    from types import SimpleNamespace
+    config = SimpleNamespace(api_key='test-secret')
+    frame = tmp_path / 'frame.jpg'
+    frame.write_bytes(b'test-jpeg-bytes')
+    requests = []
+    class Response:
+        def __enter__(self): return self
+        def __exit__(self, *args): pass
+        def read(self, limit):
+            return json.dumps({'model':'deepseek-flash','choices':[{'finish_reason':'stop','message':{'content':'{"labels": []}'}}]}).encode()
+    class Opener:
+        def open(self, request, timeout):
+            requests.append(request)
+            return Response()
+    monkeypatch.setattr(worker.urllib.request, 'build_opener', lambda *_: Opener())
+    result = worker.call_model(config, frame, prompt='two-road-fields-only', max_tokens=1024) if custom else worker.call_model(config, frame)
+    payload = json.loads(requests[0].data)
+    assert payload['messages'][0]['content'][0]['text'] == ('two-road-fields-only' if custom else worker.build_annotation_prompt())
+    assert payload['max_tokens'] == (1024 if custom else 8192)
+    assert payload['messages'][0]['content'][1]['image_url']['url'].startswith('data:image/jpeg;base64,')
+    assert payload['thinking'] == {'type': 'disabled'}
+    assert payload['model'] == 'deepseek-flash'
+    assert 'test-secret' not in json.dumps(result)

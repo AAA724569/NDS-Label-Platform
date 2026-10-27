@@ -374,14 +374,14 @@ def parse_model_response(response: dict) -> dict:
     return {'raw_content': raw, 'model': MODEL, 'usage': safe_usage}
 
 
-def call_model(config: Config, frame: Path) -> dict:
+def call_model(config: Config, frame: Path, *, prompt: str | None = None, max_tokens: int = 8192) -> dict:
     encoded = base64.b64encode(frame.read_bytes()).decode('ascii')
     payload = {'model': MODEL, 'messages': [{'role': 'user', 'content': [
-        {'type': 'text', 'text': build_annotation_prompt()},
+        {'type': 'text', 'text': build_annotation_prompt() if prompt is None else prompt},
         {'type': 'image_url', 'image_url': {'url': 'data:image/jpeg;base64,' + encoded,
                                          'detail': 'original'}}]}],
         'thinking': {'type': 'disabled'}, 'response_format': {'type': 'json_object'},
-        'temperature': 0.1, 'max_tokens': 8192}
+        'temperature': 0.1, 'max_tokens': max_tokens}
     request = urllib.request.Request('https://api.deepseek.com/chat/completions',
         data=json.dumps(payload, ensure_ascii=False).encode(),
         headers={'Authorization': 'Bearer ' + config.api_key, 'Content-Type': 'application/json'})
